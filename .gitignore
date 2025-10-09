@@ -1,0 +1,21 @@
+# Dependencies
+server/node_modules/
+server/package-lock.json
+
+# Build/Temp outputs
+server/temp/
+server/downloads/
+server/models/
+
+# OS/Editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Media samples
+server/sample_clip.mp4
+
+# Logs
+*.log
+server/logs/

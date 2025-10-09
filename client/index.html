@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI動画クリップ生成ツール</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { scroll-behavior: smooth; font-family: 'Inter', 'Noto Sans JP', sans-serif; }
+        .slider-track { top: 50%; transform: translateY(-50%); }
+        .slider-thumb { transform: translateX(-50%); }
+        .processing-bar-inner { transition: width 0.5s ease-in-out; }
+        .toggle-switch-bg:focus-within { box-shadow: 0 0 0 2px #3b82f6; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #3b82f6; }
+        .toggle-checkbox:checked + .toggle-label::after { transform: translateX(100%); border-color: #3b82f6; }
+        .toggle-label::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background-color: white; border-radius: 50%; transition: transform 0.2s; }
+        .toggle-label { position: relative; display: inline-block; width: 48px; height: 24px; border-radius: 9999px; transition: background-color 0.2s; }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans text-gray-800">
+
+    <!-- Authentication Container -->
+    <div id="auth-container" class="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
+        <div class="w-full max-w-md bg-white rounded-lg shadow-md p-8">
+            <!-- Login Form -->
+            <div id="login-form-container">
+                <div class="flex justify-center items-center mb-6">
+                     <svg class="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                    <h1 class="text-2xl font-bold ml-2">ログイン</h1>
+                </div>
+                <form id="login-form">
+                    <div class="mb-4">
+                        <label for="login-email" class="block text-sm font-medium text-gray-700">メールアドレス</label>
+                        <input type="email" id="login-email" name="email" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500" required value="test@example.com">
+                    </div>
+                    <div class="mb-6">
+                        <label for="login-password" class="block text-sm font-medium text-gray-700">パスワード</label>
+                        <input type="password" id="login-password" name="password" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500" required value="password">
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">サインイン</button>
+                    <p id="login-error" class="text-red-500 text-sm mt-2 text-center h-4"></p>
+                </form>
+                <p class="text-center text-sm text-gray-600 mt-4">
+                    アカウントをお持ちでないですか？ <span id="show-register-form" class="font-medium text-blue-600 hover:text-blue-500 cursor-pointer">新規登録</span>
+                </p>
+            </div>
+
+            <!-- Register Form (hidden by default) -->
+            <div id="register-form-container" class="hidden">
+                 <div class="flex justify-center items-center mb-6">
+                     <svg class="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                    <h1 class="text-2xl font-bold ml-2">新規登録</h1>
+                </div>
+                <form id="register-form">
+                    <div class="mb-4">
+                        <label for="register-email" class="block text-sm font-medium text-gray-700">メールアドレス</label>
+                        <input type="email" id="register-email" name="email" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+                    <div class="mb-6">
+                        <label for="register-password" class="block text-sm font-medium text-gray-700">パスワード</label>
+                        <input type="password" id="register-password" name="password" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+                    <button type="submit" class="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">登録する</button>
+                    <p id="register-message" class="text-sm mt-2 text-center h-4"></p>
+                </form>
+                 <p class="text-center text-sm text-gray-600 mt-4">
+                    既にアカウントをお持ちですか？ <span id="show-login-form" class="font-medium text-blue-600 hover:text-blue-500 cursor-pointer">ログイン</span>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App Container (Initially hidden) -->
+    <div id="app-container" class="hidden">
+        <header class="bg-white shadow-sm sticky top-0 z-10">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+                <div class="flex items-center space-x-2">
+                    <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                    <h1 class="text-xl font-bold text-gray-800">切り抜き動画生成アプリ</h1>
+                    <p class="text-xs text-gray-500 pt-1">AI powered video clip generator</p>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span id="user-email" class="text-sm text-gray-600"></span>
+                    <button id="logout-button" class="text-sm font-medium text-gray-600 hover:text-blue-600 flex items-center">
+                        <i class="fas fa-sign-out-alt mr-1"></i>ログアウト
+                    </button>
+                    <span id="backend-status" class="hidden text-sm text-gray-400"></span>
+                </div>
+            </div>
+        </header>
+
+        <main id="main-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div id="settings-section">
+                <p class="text-center text-gray-600 mb-8">YouTube、Instagram、X(Twitter)の動画URLを入力、または動画ファイルをアップロードするだけで、AIが最適な切り抜き区間を分析し、縦動画クリップを自動生成します。</p>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Left Column: Input and Settings -->
+                    <div class="lg:col-span-2 space-y-8">
+                        <!-- Video Source -->
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <div class="flex border-b mb-4">
+                                <button class="tab-button active flex-1 py-2 text-center text-blue-600 border-b-2 border-blue-600 font-semibold" data-tab="url">
+                                    <i class="fas fa-link mr-2"></i>URLから
+                                </button>
+                                <button class="tab-button flex-1 py-2 text-center text-gray-500" data-tab="upload">
+                                    <i class="fas fa-upload mr-2"></i>アップロード
+                                </button>
+                            </div>
+                            <div id="url-content">
+                                <label for="video-urls" class="block text-sm font-medium text-gray-700 mb-1">動画URL (複数の場合は改行で区切ってください)</label>
+                                <textarea id="video-urls" rows="4" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="https://youtu.be/xxxxx&#10;https://www.instagram.com/reel/xxxxx"></textarea>
+                                <button id="connection-test-button" class="mt-4 w-full bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50 flex items-center justify-center transition-all duration-300">
+                                    <i class="fas fa-plug mr-2"></i><span class="btn-text">接続テスト</span>
+                                </button>
+                            </div>
+                            <div id="upload-content" class="hidden">
+                               <p class="text-center text-gray-500 p-8 border-2 border-dashed rounded-lg">ここにファイルをドラッグ＆ドロップ<br>またはクリックしてファイルを選択</p>
+                            </div>
+                        </div>
+
+                        <!-- Clip Settings -->
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center"><i class="fas fa-sliders-h mr-3 text-gray-500"></i>切り抜き設定</h3>
+                            <!-- Mode -->
+                            <div class="mb-6">
+                                 <label class="block text-sm font-medium text-gray-700 mb-2">切り抜きモード</label>
+                                 <div class="flex rounded-md shadow-sm border border-gray-300 p-1 bg-gray-100">
+                                    <button id="ai-mode-button" class="mode-button active flex-1 relative inline-flex items-center justify-center px-4 py-2 rounded-md bg-white text-sm font-medium text-blue-600 shadow-sm">
+                                        <i class="fas fa-robot mr-2"></i>AI自動選択
+                                    </button>
+                                    <button id="manual-mode-button" class="mode-button flex-1 relative -ml-px inline-flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                        <i class="fas fa-hand-paper mr-2"></i>手動指定
+                                    </button>
+                                </div>
+                                <p class="text-xs text-gray-500 mt-2">AIが動画の内容を分析して自動的に切り抜き位置を選択します</p>
+                            </div>
+
+                            <!-- Sliders -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-6">
+                                <!-- Duration -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">切り抜き時間</label>
+                                    <div class="mt-2" data-slider="duration" data-min="30" data-max="180" data-start-min="50" data-start-max="130">
+                                        <div class="flex justify-between text-xs text-gray-500">
+                                            <span>最小時間: <span class="font-bold text-gray-800" data-value="min">50</span>秒</span>
+                                            <span>最大時間: <span class="font-bold text-gray-800" data-value="max">130</span>秒</span>
+                                        </div>
+                                        <div class="relative h-5 mt-2">
+                                            <div class="slider-track absolute bg-gray-200 h-1 w-full rounded-full"></div>
+                                            <div class="slider-range absolute bg-blue-500 h-1 rounded-full"></div>
+                                            <div class="slider-thumb absolute bg-blue-600 w-4 h-4 rounded-full cursor-pointer -top-1.5" data-thumb="min"></div>
+                                            <div class="slider-thumb absolute bg-blue-600 w-4 h-4 rounded-full cursor-pointer -top-1.5" data-thumb="max"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <!-- Count -->
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">切り抜き本数</label>
+                                    <div class="mt-2" data-slider="count" data-min="1" data-max="15" data-start-min="3" data-start-max="8">
+                                         <div class="flex justify-between text-xs text-gray-500">
+                                            <span>最小本数: <span class="font-bold text-gray-800" data-value="min">3</span>本</span>
+                                            <span>最大本数: <span class="font-bold text-gray-800" data-value="max">8</span>本</span>
+                                        </div>
+                                        <div class="relative h-5 mt-2">
+                                            <div class="slider-track absolute bg-gray-200 h-1 w-full rounded-full"></div>
+                                            <div class="slider-range absolute bg-blue-500 h-1 rounded-full"></div>
+                                            <div class="slider-thumb absolute bg-blue-600 w-4 h-4 rounded-full cursor-pointer -top-1.5" data-thumb="min"></div>
+                                            <div class="slider-thumb absolute bg-blue-600 w-4 h-4 rounded-full cursor-pointer -top-1.5" data-thumb="max"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Toggles -->
+                            <div class="space-y-2">
+                               <label class="flex items-center justify-between p-3 rounded-md hover:bg-gray-50 cursor-pointer">
+                                    <div>
+                                        <span class="font-medium text-gray-900">タイトル自動生成</span>
+                                        <p class="text-sm text-gray-500">AIが各クリップの内容から魅力的なタイトルを自動生成し、動画に表示します</p>
+                                    </div>
+                                    <div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in toggle-switch-bg rounded-full">
+                                        <input type="checkbox" id="autoTitleToggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" data-target="#title-settings-container" checked/>
+                                        <label for="autoTitleToggle" class="toggle-label"></label>
+                                    </div>
+                                </label>
+                                 <label class="flex items-center justify-between p-3 rounded-md hover:bg-gray-50 cursor-pointer">
+                                    <div>
+                                        <span class="font-medium text-gray-900">サブタイトル生成</span>
+                                        <p class="text-sm text-gray-500">メインタイトルに加えてサブタイトルも自動生成</p>
+                                    </div>
+                                    <div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in toggle-switch-bg rounded-full">
+                                        <input type="checkbox" id="autoSubtitleToggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" checked/>
+                                        <label for="autoSubtitleToggle" class="toggle-label"></label>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                         <div id="title-settings-container" class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center"><i class="fas fa-palette mr-3 text-gray-500"></i>タイトル設定</h3>
+                            <div id="title-preview" class="bg-black text-white p-4 rounded-lg text-center mb-6 relative overflow-hidden flex items-center justify-center" style="height: 180px;">
+                                <div class="absolute">
+                                    <h4 id="preview-main-title" class="text-2xl font-bold" style="font-family: 'Yu Gothic'; font-weight: 700; color: #FFFFFF; text-shadow: rgb(0, 0, 0) 0px 0px 2px;">サンプルタイトル</h4>
+                                    <p id="preview-sub-title" class="text-lg" style="font-family: 'Yu Gothic'; font-weight: 700; color: #FFFFFF; text-shadow: rgb(0, 0, 0) 0px 0px 2px;">サブタイトル例</p>
+                                </div>
+                                <p class="absolute bottom-2 right-3 text-xs opacity-50">プレビュー</p>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">フォント</label>
+                                    <select id="title-font" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                        <optgroup label="ゴシック体">
+                                            <option selected>遊ゴシック</option>
+                                            <option>メイリオ</option>
+                                            <option>MS ゴシック</option>
+                                        </optgroup>
+                                        <optgroup label="明朝体">
+                                            <option>遊明朝</option>
+                                            <option>MS 明朝</option>
+                                        </optgroup>
+                                    </select>
+                                </div>
+                                <div>
+                                   <label class="block text-sm font-medium text-gray-700">太さ</label>
+                                   <select id="title-weight" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                        <option value="400">標準</option>
+                                        <option value="700" selected>太字</option>
+                                        <option value="900">極太</option>
+                                   </select>
+                                </div>
+                            </div>
+                            <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+                                <p class="font-semibold mb-2">メインタイトル</p>
+                                <div class="grid grid-cols-2 gap-4 text-sm items-center">
+                                    <div><label>サイズ: <span id="main-title-size-val">80</span>px</label><input id="main-title-size" type="range" min="20" max="100" value="80" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"></div>
+                                    <div><label>縁幅: <span id="main-title-stroke-val">2</span>px</label><input id="main-title-stroke" type="range" min="0" max="10" value="2" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"></div>
+                                    <div class="flex items-center"> <label class="mr-2">文字色</label> <input id="main-title-color" type="color" value="#FFFFFF" class="w-full h-8 p-1 border border-gray-300 rounded-md"></div>
+                                    <div class="flex items-center"> <label class="mr-2">縁色</label> <input id="main-title-stroke-color" type="color" value="#000000" class="w-full h-8 p-1 border border-gray-300 rounded-md"></div>
+                                </div>
+                            </div>
+                             <div class="mt-4 p-4 bg-gray-50 rounded-lg">
+                                <p class="font-semibold mb-2">サブタイトル</p>
+                                 <div class="grid grid-cols-2 gap-4 text-sm items-center">
+                                    <div><label>サイズ: <span id="sub-title-size-val">60</span>px</label><input id="sub-title-size" type="range" min="10" max="80" value="60" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"></div>
+                                    <div><label>縁幅: <span id="sub-title-stroke-val">2</span>px</label><input id="sub-title-stroke" type="range" min="0" max="10" value="2" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"></div>
+                                    <div class="flex items-center"> <label class="mr-2">文字色</label> <input id="sub-title-color" type="color" value="#FFFFFF" class="w-full h-8 p-1 border border-gray-300 rounded-md"></div>
+                                    <div class="flex items-center"> <label class="mr-2">縁色</label> <input id="sub-title-stroke-color" type="color" value="#000000" class="w-full h-8 p-1 border border-gray-300 rounded-md"></div>
+                                </div>
+                            </div>
+                         </div>
+                    </div>
+
+                    <!-- Right Column: Execution and Status -->
+                    <div class="lg:col-span-1">
+                        <div class="bg-white p-6 rounded-lg shadow sticky top-24">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center"><i class="fas fa-play-circle mr-3 text-gray-500"></i>処理実行</h3>
+                            <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-r-lg mb-4">
+                                <div class="flex justify-between text-sm">
+                                    <span class="font-semibold text-blue-800">推定コスト</span>
+                                    <span id="estimated-cost" class="font-bold text-blue-800">$0.00</span>
+                                </div>
+                                 <div class="flex justify-between text-sm mt-1">
+                                    <span class="font-semibold text-blue-800">推定時間</span>
+                                    <span id="estimated-time" class="font-bold text-blue-800">0-0分</span>
+                                </div>
+                            </div>
+                            <div class="text-sm text-gray-600 space-y-2 mb-4">
+                                <p class="font-semibold">設定サマリー:</p>
+                                <ul id="summary-list" class="list-disc list-inside text-xs">
+                                </ul>
+                            </div>
+                            <button id="process-button" class="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 text-lg font-bold disabled:bg-gray-400 disabled:cursor-not-allowed">
+                                <i class="fas fa-cogs mr-2"></i>処理開始
+                            </button>
+                            <p class="text-xs text-gray-500 mt-2 text-center">動画URLを入力またはファイルをアップロードして、設定を調整後に「処理開始」ボタンを押してください</p>
+
+                            <div id="processing-status" class="mt-6 hidden">
+                                 <h3 class="text-lg font-semibold mb-4 flex items-center"><i class="fas fa-tasks mr-3 text-gray-500"></i>処理状況</h3>
+                                 <div id="processing-overall-status" class="flex justify-between items-center mb-2">
+                                     <p>全体進捗</p>
+                                     <span id="progress-percentage" class="font-bold text-blue-600">0%</span>
+                                 </div>
+                                 <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                    <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full processing-bar-inner" style="width: 0%"></div>
+                                 </div>
+                                 <p id="processing-message" class="text-sm text-center text-gray-600 mt-2">処理を開始しています...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="results-section" class="mt-12 hidden">
+                <h2 class="text-2xl font-semibold mb-6">生成されたクリップ</h2>
+                <div class="flex justify-end mb-4 space-x-2">
+                    <button class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"><i class="fas fa-file-archive mr-2"></i>まとめてダウンロード (ZIP + CSV)</button>
+                    <button id="reset-button" class="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300"><i class="fas fa-plus mr-2"></i>新しい処理を開始</button>
+                </div>
+                <div id="clips-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
+
