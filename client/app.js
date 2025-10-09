@@ -301,3 +301,7 @@ function init() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+if (document.readyState !== 'loading') {
+  // DOMContentLoaded が既に発火済みの場合のフォールバック
+  init();
+}
