@@ -13,43 +13,46 @@ async function apiFetch(path, options = {}) {
 // UI helpers
 function $(selector) { return document.querySelector(selector); }
 function $all(selector) { return Array.from(document.querySelectorAll(selector)); }
+function on(el, evt, handler) { if (el) el.addEventListener(evt, handler); }
 
-function setHidden(el, hidden) { if (hidden) el.classList.add('hidden'); else el.classList.remove('hidden'); }
+function setHidden(el, hidden) { if (el) { if (hidden) el.classList.add('hidden'); else el.classList.remove('hidden'); } }
 
 // Auth flows
 async function handleLogin(e) {
   e.preventDefault();
-  const email = $('#login-email').value.trim();
-  const password = $('#login-password').value.trim();
+  const email = $('#login-email')?.value?.trim() || '';
+  const password = $('#login-password')?.value?.trim() || '';
   try {
     const data = await apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) });
     authToken = data.token;
-    $('#user-email').textContent = email;
+    const emailEl = $('#user-email'); if (emailEl) emailEl.textContent = email;
     setHidden($('#auth-container'), true);
     setHidden($('#app-container'), false);
   } catch (err) {
-    $('#login-error').textContent = 'ログインに失敗しました';
+    const errEl = $('#login-error'); if (errEl) errEl.textContent = 'ログインに失敗しました';
+    console.error(err);
   }
 }
 
 async function handleRegister(e) {
   e.preventDefault();
-  const email = $('#register-email').value.trim();
-  const password = $('#register-password').value.trim();
+  const email = $('#register-email')?.value?.trim() || '';
+  const password = $('#register-password')?.value?.trim() || '';
   try {
     await apiFetch('/auth/register', { method: 'POST', body: JSON.stringify({ email, password }) });
-    $('#register-message').textContent = '登録に成功しました。ログインしてください。';
+    const msg = $('#register-message'); if (msg) msg.textContent = '登録に成功しました。ログインしてください。';
     setHidden($('#register-form-container'), true);
     setHidden($('#login-form-container'), false);
-    $('#login-email').value = email;
+    const loginEmail = $('#login-email'); if (loginEmail) loginEmail.value = email;
   } catch (err) {
-    $('#register-message').textContent = '登録に失敗しました';
+    const msg = $('#register-message'); if (msg) msg.textContent = '登録に失敗しました';
+    console.error(err);
   }
 }
 
 // Tabs
 function setupTabs() {
-  $all('.tab-button').forEach(btn => btn.addEventListener('click', () => {
+  $all('.tab-button').forEach(btn => on(btn, 'click', () => {
     $all('.tab-button').forEach(b => b.classList.remove('active', 'text-blue-600', 'border-blue-600'));
     btn.classList.add('active', 'text-blue-600', 'border-blue-600');
     const tab = btn.getAttribute('data-tab');
@@ -62,8 +65,8 @@ function setupTabs() {
 function setupMode() {
   const aiBtn = $('#ai-mode-button');
   const manualBtn = $('#manual-mode-button');
-  aiBtn.addEventListener('click', () => { aiBtn.classList.add('bg-white', 'text-blue-600'); manualBtn.classList.remove('bg-white', 'text-blue-600'); });
-  manualBtn.addEventListener('click', () => { manualBtn.classList.add('bg-white', 'text-blue-600'); aiBtn.classList.remove('bg-white', 'text-blue-600'); });
+  on(aiBtn, 'click', () => { aiBtn.classList.add('bg-white', 'text-blue-600'); manualBtn?.classList.remove('bg-white', 'text-blue-600'); });
+  on(manualBtn, 'click', () => { manualBtn.classList.add('bg-white', 'text-blue-600'); aiBtn?.classList.remove('bg-white', 'text-blue-600'); });
 }
 
 // Sliders
@@ -75,11 +78,12 @@ function setupSliders() {
       const rangeEl = container.querySelector('.slider-range');
       const minLabel = container.querySelector('[data-value="min"]');
       const maxLabel = container.querySelector('[data-value="max"]');
+      const track = container.querySelector('.slider-track');
+      if (!minThumb || !maxThumb || !rangeEl || !minLabel || !maxLabel || !track) return;
       const min = +container.getAttribute('data-min');
       const max = +container.getAttribute('data-max');
       let curMin = +container.getAttribute('data-start-min');
       let curMax = +container.getAttribute('data-start-max');
-      const trackWidth = container.querySelector('.slider-track').clientWidth;
 
       function update() {
         const left = ((curMin - min) / (max - min)) * 100;
@@ -88,8 +92,8 @@ function setupSliders() {
         rangeEl.style.right = (100 - right) + '%';
         minThumb.style.left = left + '%';
         maxThumb.style.left = right + '%';
-        minLabel.textContent = curMin;
-        maxLabel.textContent = curMax;
+        minLabel.textContent = String(curMin);
+        maxLabel.textContent = String(curMax);
         updateSummary();
       }
 
@@ -98,12 +102,11 @@ function setupSliders() {
           const rect = container.getBoundingClientRect();
           const x = Math.min(Math.max(e.clientX - rect.left, 0), rect.width);
           const value = Math.round(min + (x / rect.width) * (max - min));
-          if (isMin) curMin = Math.min(value, curMax);
-          else curMax = Math.max(value, curMin);
+          if (isMin) curMin = Math.min(value, curMax); else curMax = Math.max(value, curMin);
           update();
         }
         function onUp() { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); }
-        thumb.addEventListener('mousedown', () => { window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp); });
+        on(thumb, 'mousedown', () => { window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp); });
       }
 
       attachDrag(minThumb, true);
@@ -115,17 +118,17 @@ function setupSliders() {
 // Title settings UI
 function getTitleSettings() {
   return {
-    auto: $('#autoTitleToggle').checked,
-    font: $('#title-font').value,
-    weight: +$('#title-weight').value,
-    mainSize: +$('#main-title-size').value,
-    mainColor: $('#main-title-color').value,
-    mainStrokeWidth: +$('#main-title-stroke').value,
-    mainStrokeColor: $('#main-title-stroke-color').value,
-    subSize: +$('#sub-title-size').value,
-    subColor: $('#sub-title-color').value,
-    subStrokeWidth: +$('#sub-title-stroke').value,
-    subStrokeColor: $('#sub-title-stroke-color').value,
+    auto: $('#autoTitleToggle')?.checked ?? true,
+    font: $('#title-font')?.value || '遊ゴシック',
+    weight: +($('#title-weight')?.value || 700),
+    mainSize: +($('#main-title-size')?.value || 80),
+    mainColor: $('#main-title-color')?.value || '#FFFFFF',
+    mainStrokeWidth: +($('#main-title-stroke')?.value || 2),
+    mainStrokeColor: $('#main-title-stroke-color')?.value || '#000000',
+    subSize: +($('#sub-title-size')?.value || 60),
+    subColor: $('#sub-title-color')?.value || '#FFFFFF',
+    subStrokeWidth: +($('#sub-title-stroke')?.value || 2),
+    subStrokeColor: $('#sub-title-stroke-color')?.value || '#000000',
   };
 }
 
@@ -133,33 +136,37 @@ function updateTitlePreview() {
   const s = getTitleSettings();
   const main = $('#preview-main-title');
   const sub = $('#preview-sub-title');
-  main.style.fontWeight = String(s.weight);
-  main.style.fontSize = s.mainSize + 'px';
-  main.style.color = s.mainColor;
-  main.style.textShadow = `${s.mainStrokeColor} 0px 0px ${Math.max(1, s.mainStrokeWidth)}px`;
-  sub.style.fontSize = s.subSize + 'px';
-  sub.style.color = s.subColor;
-  sub.style.textShadow = `${s.subStrokeColor} 0px 0px ${Math.max(1, s.subStrokeWidth)}px`;
+  if (main) {
+    main.style.fontWeight = String(s.weight);
+    main.style.fontSize = s.mainSize + 'px';
+    main.style.color = s.mainColor;
+    main.style.textShadow = `${s.mainStrokeColor} 0px 0px ${Math.max(1, s.mainStrokeWidth)}px`;
+  }
+  if (sub) {
+    sub.style.fontSize = s.subSize + 'px';
+    sub.style.color = s.subColor;
+    sub.style.textShadow = `${s.subStrokeColor} 0px 0px ${Math.max(1, s.subStrokeWidth)}px`;
+  }
 }
 
 $all('#main-title-size,#main-title-stroke,#main-title-color,#main-title-stroke-color,#sub-title-size,#sub-title-stroke,#sub-title-color,#sub-title-stroke-color,#title-font,#title-weight'.split(','))
-  .forEach(sel => document.querySelector(sel).addEventListener('input', () => { updateTitlePreview(); updateSummary(); }));
+  .forEach(sel => { const el = document.querySelector(sel); on(el, 'input', () => { updateTitlePreview(); updateSummary(); }); });
 
-$('#autoTitleToggle').addEventListener('change', () => { setHidden($('#title-settings-container'), !$('#autoTitleToggle').checked); updateSummary(); });
+on($('#autoTitleToggle'), 'change', () => { setHidden($('#title-settings-container'), !($('#autoTitleToggle')?.checked)); updateSummary(); });
 
 // Summary
 function updateSummary() {
-  const ul = $('#summary-list');
+  const ul = $('#summary-list'); if (!ul) return;
   ul.innerHTML = '';
 
   // duration
   const duration = document.querySelector('[data-slider="duration"]');
-  const dmin = duration.querySelector('[data-value="min"]').textContent;
-  const dmax = duration.querySelector('[data-value="max"]').textContent;
+  const dmin = duration?.querySelector('[data-value="min"]')?.textContent || '0';
+  const dmax = duration?.querySelector('[data-value="max"]')?.textContent || '0';
   // count
   const count = document.querySelector('[data-slider="count"]');
-  const cmin = count.querySelector('[data-value="min"]').textContent;
-  const cmax = count.querySelector('[data-value="max"]').textContent;
+  const cmin = count?.querySelector('[data-value="min"]')?.textContent || '0';
+  const cmax = count?.querySelector('[data-value="max"]')?.textContent || '0';
 
   const li1 = document.createElement('li'); li1.textContent = `切り抜き時間: ${dmin}-${dmax} 秒`; ul.appendChild(li1);
   const li2 = document.createElement('li'); li2.textContent = `切り抜き本数: ${cmin}-${cmax} 本`; ul.appendChild(li2);
@@ -180,45 +187,48 @@ function updateSummary() {
 
 // Connection test
 async function handleConnectionTest() {
-  const urls = $('#video-urls').value.trim().split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const urls = $('#video-urls')?.value?.trim()?.split(/\n+/).map(s => s.trim()).filter(Boolean) || [];
   if (urls.length === 0) return;
   const btn = $('#connection-test-button');
-  const original = btn.querySelector('.btn-text').textContent;
-  btn.disabled = true; btn.querySelector('.btn-text').textContent = '接続確認中...';
+  const label = btn?.querySelector('.btn-text');
+  const original = label?.textContent || '';
+  if (btn) { btn.disabled = true; }
+  if (label) label.textContent = '接続確認中...';
   try {
     const res = await apiFetch('/jobs/test-url', { method: 'POST', body: JSON.stringify({ url: urls[0] }) });
-    btn.querySelector('.btn-text').textContent = `成功: ${res.title}`;
+    if (label) label.textContent = `成功: ${res.title}`;
   } catch (_) {
-    btn.querySelector('.btn-text').textContent = '失敗しました';
+    if (label) label.textContent = '失敗しました';
   } finally {
-    setTimeout(() => { btn.disabled = false; btn.querySelector('.btn-text').textContent = original; }, 1500);
+    setTimeout(() => { if (btn) btn.disabled = false; if (label) label.textContent = original; }, 1500);
   }
 }
 
 // Start processing
 async function handleProcess() {
-  const urls = $('#video-urls').value.trim().split(/\n+/).map(s => s.trim()).filter(Boolean);
+  const urls = $('#video-urls')?.value?.trim()?.split(/\n+/).map(s => s.trim()).filter(Boolean) || [];
   if (urls.length === 0) return;
   const duration = document.querySelector('[data-slider="duration"]');
   const count = document.querySelector('[data-slider="count"]');
   const settings = {
-    durationMin: +duration.querySelector('[data-value="min"]').textContent,
-    durationMax: +duration.querySelector('[data-value="max"]').textContent,
-    countMin: +count.querySelector('[data-value="min"]').textContent,
-    countMax: +count.querySelector('[data-value="max"]').textContent,
+    durationMin: +(duration?.querySelector('[data-value="min"]')?.textContent || 0),
+    durationMax: +(duration?.querySelector('[data-value="max"]')?.textContent || 0),
+    countMin: +(count?.querySelector('[data-value="min"]')?.textContent || 0),
+    countMax: +(count?.querySelector('[data-value="max"]')?.textContent || 0),
     title: getTitleSettings(),
   };
 
   setHidden($('#processing-status'), false);
-  $('#processing-message').textContent = '処理を開始しています...';
-  $('#progress-bar').style.width = '0%';
-  $('#progress-percentage').textContent = '0%';
+  const msg = $('#processing-message'); if (msg) msg.textContent = '処理を開始しています...';
+  const bar = $('#progress-bar'); if (bar) bar.style.width = '0%';
+  const perc = $('#progress-percentage'); if (perc) perc.textContent = '0%';
 
   try {
     const { jobId } = await apiFetch('/jobs', { method: 'POST', body: JSON.stringify({ sourceUrl: urls[0], settings }) });
     await pollJob(jobId);
   } catch (e) {
-    $('#processing-message').textContent = 'ジョブの開始に失敗しました';
+    const m = $('#processing-message'); if (m) m.textContent = 'ジョブの開始に失敗しました';
+    console.error(e);
   }
 }
 
@@ -226,16 +236,16 @@ async function pollJob(jobId) {
   const tick = async () => {
     try {
       const s = await apiFetch(`/jobs/${jobId}/status`);
-      $('#progress-bar').style.width = `${s.progress}%`;
-      $('#progress-percentage').textContent = `${s.progress}%`;
+      const bar = $('#progress-bar'); if (bar) bar.style.width = `${s.progress}%`;
+      const perc = $('#progress-percentage'); if (perc) perc.textContent = `${s.progress}%`;
       if (s.status === 'completed') {
         const r = await apiFetch(`/jobs/${jobId}/results`);
         renderResults(r.clips);
-        $('#processing-message').textContent = '完了しました';
+        const m = $('#processing-message'); if (m) m.textContent = '完了しました';
         return;
       }
       if (s.status === 'failed') {
-        $('#processing-message').textContent = '処理に失敗しました';
+        const m = $('#processing-message'); if (m) m.textContent = '処理に失敗しました';
         return;
       }
       setTimeout(tick, 1500);
@@ -247,7 +257,7 @@ async function pollJob(jobId) {
 }
 
 function renderResults(clips) {
-  const grid = $('#clips-grid');
+  const grid = $('#clips-grid'); if (!grid) return;
   grid.innerHTML = '';
   setHidden($('#results-section'), false);
   clips.forEach(c => {
@@ -268,22 +278,26 @@ function renderResults(clips) {
 
 // Event wiring
 function init() {
-  // auth
-  $('#login-form').addEventListener('submit', handleLogin);
-  $('#register-form').addEventListener('submit', handleRegister);
-  $('#show-register-form').addEventListener('click', () => { setHidden($('#login-form-container'), true); setHidden($('#register-form-container'), false); });
-  $('#show-login-form').addEventListener('click', () => { setHidden($('#register-form-container'), true); setHidden($('#login-form-container'), false); });
-  $('#logout-button').addEventListener('click', () => { authToken = ''; setHidden($('#app-container'), true); setHidden($('#auth-container'), false); });
+  try {
+    // auth
+    on($('#login-form'), 'submit', handleLogin);
+    on($('#register-form'), 'submit', handleRegister);
+    on($('#show-register-form'), 'click', () => { setHidden($('#login-form-container'), true); setHidden($('#register-form-container'), false); });
+    on($('#show-login-form'), 'click', () => { setHidden($('#register-form-container'), true); setHidden($('#login-form-container'), false); });
+    on($('#logout-button'), 'click', () => { authToken = ''; setHidden($('#app-container'), true); setHidden($('#auth-container'), false); });
 
-  setupTabs();
-  setupMode();
-  setupSliders();
-  updateTitlePreview();
-  updateSummary();
+    setupTabs();
+    setupMode();
+    setupSliders();
+    updateTitlePreview();
+    updateSummary();
 
-  $('#connection-test-button').addEventListener('click', handleConnectionTest);
-  $('#process-button').addEventListener('click', handleProcess);
-  $('#reset-button').addEventListener('click', () => { location.reload(); });
+    on($('#connection-test-button'), 'click', handleConnectionTest);
+    on($('#process-button'), 'click', handleProcess);
+    on($('#reset-button'), 'click', () => { location.reload(); });
+  } catch (e) {
+    console.error('Initialization failed', e);
+  }
 }
 
 document.addEventListener('DOMContentLoaded', init);
