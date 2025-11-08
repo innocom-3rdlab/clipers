@@ -1,11 +1,14 @@
 # Dependencies
-server/node_modules/
-server/package-lock.json
+/node_modules
+/package-lock.json
+/server/node_modules
+/server/package-lock.json
 
 # Build/Temp outputs
-server/temp/
-server/downloads/
-server/models/
+/server/temp/
+/server/downloads/
+/server/models/
+/server/clips/
 
 # OS/Editor
 .DS_Store
@@ -13,9 +16,15 @@ server/models/
 .idea/
 .vscode/
 
-# Media samples
-server/sample_clip.mp4
+# Media files
+*.mp4
+*.flac
 
 # Logs
 *.log
-server/logs/
+/server/logs/
+
+# Data/Credentials
+/server/db.json
+/server/google-credentials.json
+/server/clip_*.mp4

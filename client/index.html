@@ -3,9 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI動画クリップ生成ツール</title>
+    <title>AI動画クリップ生成ツール (Gemini版)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         body { scroll-behavior: smooth; font-family: 'Inter', 'Noto Sans JP', sans-serif; }
         .slider-track { top: 50%; transform: translateY(-50%); }
@@ -15,7 +18,7 @@
         .toggle-checkbox:checked + .toggle-label { background-color: #3b82f6; }
         .toggle-checkbox:checked + .toggle-label::after { transform: translateX(100%); border-color: #3b82f6; }
         .toggle-label::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background-color: white; border-radius: 50%; transition: transform 0.2s; }
-        .toggle-label { position: relative; display: inline-block; width: 48px; height: 24px; border-radius: 9999px; transition: background-color 0.2s; }
+        .toggle-label { position: relative; display: inline-block; width: 48px; height: 24px; border-radius: 9999px; background-color: #e5e7eb; transition: background-color 0.2s; }
     </style>
 </head>
 <body class="bg-gray-50 font-sans text-gray-800">
@@ -62,7 +65,7 @@
                         <input type="password" id="register-password" name="password" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
                     </div>
                     <button type="submit" class="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">登録する</button>
-                    <p id="register-message" class="text-sm mt-2 text-center h-4"></p>
+                    <p id="register-error" class="text-red-500 text-sm mt-2 text-center h-4"></p>
                 </form>
                  <p class="text-center text-sm text-gray-600 mt-4">
                     既にアカウントをお持ちですか？ <span id="show-login-form" class="font-medium text-blue-600 hover:text-blue-500 cursor-pointer">ログイン</span>
@@ -78,73 +81,50 @@
                 <div class="flex items-center space-x-2">
                     <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                     <h1 class="text-xl font-bold text-gray-800">切り抜き動画生成アプリ</h1>
-                    <p class="text-xs text-gray-500 pt-1">AI powered video clip generator</p>
                 </div>
                 <div class="flex items-center space-x-4">
                     <span id="user-email" class="text-sm text-gray-600"></span>
                     <button id="logout-button" class="text-sm font-medium text-gray-600 hover:text-blue-600 flex items-center">
                         <i class="fas fa-sign-out-alt mr-1"></i>ログアウト
                     </button>
-                    <span id="backend-status" class="hidden text-sm text-gray-400"></span>
                 </div>
             </div>
         </header>
 
         <main id="main-content" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div id="settings-section">
-                <p class="text-center text-gray-600 mb-8">YouTube、Instagram、X(Twitter)の動画URLを入力、または動画ファイルをアップロードするだけで、AIが最適な切り抜き区間を分析し、縦動画クリップを自動生成します。</p>
+                <p class="text-center text-gray-600 mb-8">YouTube動画のURLを入力するだけで、Gemini AIが最適なハイライトを分析し、縦長の切り抜き動画クリップを自動生成します。</p>
 
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <!-- Left Column: Input and Settings -->
                     <div class="lg:col-span-2 space-y-8">
-                        <!-- Video Source -->
                         <div class="bg-white p-6 rounded-lg shadow">
-                            <div class="flex border-b mb-4">
-                                <button class="tab-button active flex-1 py-2 text-center text-blue-600 border-b-2 border-blue-600 font-semibold" data-tab="url">
-                                    <i class="fas fa-link mr-2"></i>URLから
-                                </button>
-                                <button class="tab-button flex-1 py-2 text-center text-gray-500" data-tab="upload">
-                                    <i class="fas fa-upload mr-2"></i>アップロード
-                                </button>
+                            <h3 class="text-lg font-semibold mb-4 flex items-center"><i class="fas fa-link mr-3 text-gray-500"></i>動画ソース</h3>
+                            <label for="video-urls" class="block text-sm font-medium text-gray-700 mb-1">YouTube動画URL</label>
+                            <textarea id="video-urls" rows="2" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="https://www.youtube.com/watch?v=..."></textarea>
+                            <button id="load-video-button" class="mt-4 w-full bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50 flex items-center justify-center transition-all duration-300">
+                                <i class="fas fa-video mr-2"></i><span class="btn-text">動画を読み込む</span>
+                            </button>
+                            <div id="video-metadata-display" class="mt-4 p-3 bg-gray-50 rounded-md text-sm text-gray-700 hidden">
+                                <p><span class="font-semibold">タイトル:</span> <span id="metadata-title"></span></p>
+                                <p><span class="font-semibold">長さ:</span> <span id="metadata-duration"></span></p>
+                                <p><span class="font-semibold">音声トラック:</span> <span id="metadata-audio-track"></span></p>
                             </div>
-                            <div id="url-content">
-                                <label for="video-urls" class="block text-sm font-medium text-gray-700 mb-1">動画URL (複数の場合は改行で区切ってください)</label>
-                                <textarea id="video-urls" rows="4" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="https://youtu.be/xxxxx&#10;https://www.instagram.com/reel/xxxxx"></textarea>
-                                <button id="connection-test-button" class="mt-4 w-full bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50 flex items-center justify-center transition-all duration-300">
-                                    <i class="fas fa-plug mr-2"></i><span class="btn-text">接続テスト</span>
-                                </button>
-                            </div>
-                            <div id="upload-content" class="hidden">
-                               <p class="text-center text-gray-500 p-8 border-2 border-dashed rounded-lg">ここにファイルをドラッグ＆ドロップ<br>またはクリックしてファイルを選択</p>
+                            <div class="mt-4 p-3 bg-blue-50 rounded-md text-sm text-blue-700 hidden" id="cost-estimate-display">
+                                <p><span class="font-semibold">推定生成コスト:</span> <span id="estimated-cost">計算中...</span></p>
+                                <p class="text-xs text-blue-600 mt-1">※概算です。実際のコストは変動する場合があります。</p>
                             </div>
                         </div>
 
-                        <!-- Clip Settings -->
                         <div class="bg-white p-6 rounded-lg shadow">
                             <h3 class="text-lg font-semibold mb-4 flex items-center"><i class="fas fa-sliders-h mr-3 text-gray-500"></i>切り抜き設定</h3>
-                            <!-- Mode -->
-                            <div class="mb-6">
-                                 <label class="block text-sm font-medium text-gray-700 mb-2">切り抜きモード</label>
-                                 <div class="flex rounded-md shadow-sm border border-gray-300 p-1 bg-gray-100">
-                                    <button id="ai-mode-button" class="mode-button active flex-1 relative inline-flex items-center justify-center px-4 py-2 rounded-md bg-white text-sm font-medium text-blue-600 shadow-sm">
-                                        <i class="fas fa-robot mr-2"></i>AI自動選択
-                                    </button>
-                                    <button id="manual-mode-button" class="mode-button flex-1 relative -ml-px inline-flex items-center justify-center px-4 py-2 rounded-md text-sm font-medium text-gray-500 hover:bg-gray-50">
-                                        <i class="fas fa-hand-paper mr-2"></i>手動指定
-                                    </button>
-                                </div>
-                                <p class="text-xs text-gray-500 mt-2">AIが動画の内容を分析して自動的に切り抜き位置を選択します</p>
-                            </div>
-
-                            <!-- Sliders -->
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6 mb-6">
-                                <!-- Duration -->
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700">切り抜き時間</label>
-                                    <div class="mt-2" data-slider="duration" data-min="30" data-max="180" data-start-min="50" data-start-max="130">
+                                    <label class="block text-sm font-medium text-gray-700">各クリップの長さ</label>
+                                    <div class="mt-2" data-slider="duration" data-min="15" data-max="180" data-start-min="50" data-start-max="120">
                                         <div class="flex justify-between text-xs text-gray-500">
-                                            <span>最小時間: <span class="font-bold text-gray-800" data-value="min">50</span>秒</span>
-                                            <span>最大時間: <span class="font-bold text-gray-800" data-value="max">130</span>秒</span>
+                                            <span>最小: <span class="font-bold text-gray-800" data-value="min">50</span>秒</span>
+                                            <span>最大: <span class="font-bold text-gray-800" data-value="max">120</span>秒</span>
                                         </div>
                                         <div class="relative h-5 mt-2">
                                             <div class="slider-track absolute bg-gray-200 h-1 w-full rounded-full"></div>
@@ -154,13 +134,12 @@
                                         </div>
                                     </div>
                                 </div>
-                                <!-- Count -->
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700">切り抜き本数</label>
-                                    <div class="mt-2" data-slider="count" data-min="1" data-max="15" data-start-min="3" data-start-max="8">
+                                    <label class="block text-sm font-medium text-gray-700">生成する本数</label>
+                                    <div class="mt-2" data-slider="count" data-min="1" data-max="20" data-start-min="3" data-start-max="8">
                                          <div class="flex justify-between text-xs text-gray-500">
-                                            <span>最小本数: <span class="font-bold text-gray-800" data-value="min">3</span>本</span>
-                                            <span>最大本数: <span class="font-bold text-gray-800" data-value="max">8</span>本</span>
+                                            <span>最小: <span class="font-bold text-gray-800" data-value="min">3</span>本</span>
+                                            <span>最大: <span class="font-bold text-gray-800" data-value="max">8</span>本</span>
                                         </div>
                                         <div class="relative h-5 mt-2">
                                             <div class="slider-track absolute bg-gray-200 h-1 w-full rounded-full"></div>
@@ -171,13 +150,11 @@
                                     </div>
                                 </div>
                             </div>
-
-                            <!-- Toggles -->
                             <div class="space-y-2">
                                <label class="flex items-center justify-between p-3 rounded-md hover:bg-gray-50 cursor-pointer">
                                     <div>
                                         <span class="font-medium text-gray-900">タイトル自動生成</span>
-                                        <p class="text-sm text-gray-500">AIが各クリップの内容から魅力的なタイトルを自動生成し、動画に表示します</p>
+                                        <p class="text-sm text-gray-500">Gemini AIが動画の内容に合ったタイトルを自動生成します</p>
                                     </div>
                                     <div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in toggle-switch-bg rounded-full">
                                         <input type="checkbox" id="autoTitleToggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" data-target="#title-settings-container" checked/>
@@ -187,7 +164,7 @@
                                  <label class="flex items-center justify-between p-3 rounded-md hover:bg-gray-50 cursor-pointer">
                                     <div>
                                         <span class="font-medium text-gray-900">サブタイトル生成</span>
-                                        <p class="text-sm text-gray-500">メインタイトルに加えてサブタイトルも自動生成</p>
+                                        <p class="text-sm text-gray-500">メインタイトルに加えてサブタイトルも表示します</p>
                                     </div>
                                     <div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in toggle-switch-bg rounded-full">
                                         <input type="checkbox" id="autoSubtitleToggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" checked/>
@@ -196,12 +173,12 @@
                                 </label>
                             </div>
                         </div>
-                         <div id="title-settings-container" class="bg-white p-6 rounded-lg shadow">
-                            <h3 class="text-lg font-semibold mb-4 flex items-center"><i class="fas fa-palette mr-3 text-gray-500"></i>タイトル設定</h3>
-                            <div id="title-preview" class="bg-black text-white p-4 rounded-lg text-center mb-6 relative overflow-hidden flex items-center justify-center" style="height: 180px;">
+                         <div id="title-settings-container" class="bg-white p-6 rounded-lg shadow transition-all duration-300">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center"><i class="fas fa-palette mr-3 text-gray-500"></i>タイトルデザイン</h3>
+                            <div id="title-preview" class="bg-black text-white p-4 rounded-lg text-center mb-6 relative overflow-hidden flex items-center justify-center h-48">
                                 <div class="absolute">
-                                    <h4 id="preview-main-title" class="text-2xl font-bold" style="font-family: 'Yu Gothic'; font-weight: 700; color: #FFFFFF; text-shadow: rgb(0, 0, 0) 0px 0px 2px;">サンプルタイトル</h4>
-                                    <p id="preview-sub-title" class="text-lg" style="font-family: 'Yu Gothic'; font-weight: 700; color: #FFFFFF; text-shadow: rgb(0, 0, 0) 0px 0px 2px;">サブタイトル例</p>
+                                    <h4 id="preview-main-title" class="transition-all">サンプルタイトル</h4>
+                                    <p id="preview-sub-title" class="transition-all">サブタイトル例</p>
                                 </div>
                                 <p class="absolute bottom-2 right-3 text-xs opacity-50">プレビュー</p>
                             </div>
@@ -209,81 +186,152 @@
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700">フォント</label>
                                     <select id="title-font" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
-                                        <optgroup label="ゴシック体">
-                                            <option selected>遊ゴシック</option>
-                                            <option>メイリオ</option>
-                                            <option>MS ゴシック</option>
-                                        </optgroup>
-                                        <optgroup label="明朝体">
-                                            <option>遊明朝</option>
-                                            <option>MS 明朝</option>
-                                        </optgroup>
+                                        <option selected>Noto Sans JP</option>
                                     </select>
                                 </div>
                                 <div>
                                    <label class="block text-sm font-medium text-gray-700">太さ</label>
                                    <select id="title-weight" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
-                                        <option value="400">標準</option>
-                                        <option value="700" selected>太字</option>
-                                        <option value="900">極太</option>
+                                        <option value="400">標準 (Regular)</option>
+                                        <option value="700" selected>太字 (Bold)</option>
+                                        <option value="900">極太 (Black)</option>
                                    </select>
                                 </div>
                             </div>
                             <div class="mt-6 p-4 bg-gray-50 rounded-lg">
                                 <p class="font-semibold mb-2">メインタイトル</p>
                                 <div class="grid grid-cols-2 gap-4 text-sm items-center">
-                                    <div><label>サイズ: <span id="main-title-size-val">80</span>px</label><input id="main-title-size" type="range" min="20" max="100" value="80" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"></div>
+                                    <div><label>サイズ: <span id="main-title-size-val">80</span>px</label><input id="main-title-size" type="range" min="20" max="120" value="80" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"></div>
                                     <div><label>縁幅: <span id="main-title-stroke-val">2</span>px</label><input id="main-title-stroke" type="range" min="0" max="10" value="2" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"></div>
-                                    <div class="flex items-center"> <label class="mr-2">文字色</label> <input id="main-title-color" type="color" value="#FFFFFF" class="w-full h-8 p-1 border border-gray-300 rounded-md"></div>
-                                    <div class="flex items-center"> <label class="mr-2">縁色</label> <input id="main-title-stroke-color" type="color" value="#000000" class="w-full h-8 p-1 border border-gray-300 rounded-md"></div>
+                                    <div class="flex items-center"> <label class="mr-2 shrink-0">文字色</label> <input id="main-title-color" type="color" value="#FFFFFF" class="w-full h-8 p-1 border border-gray-300 rounded-md"></div>
+                                    <div class="flex items-center"> <label class="mr-2 shrink-0">縁色</label> <input id="main-title-stroke-color" type="color" value="#000000" class="w-full h-8 p-1 border border-gray-300 rounded-md"></div>
                                 </div>
                             </div>
                              <div class="mt-4 p-4 bg-gray-50 rounded-lg">
                                 <p class="font-semibold mb-2">サブタイトル</p>
                                  <div class="grid grid-cols-2 gap-4 text-sm items-center">
-                                    <div><label>サイズ: <span id="sub-title-size-val">60</span>px</label><input id="sub-title-size" type="range" min="10" max="80" value="60" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"></div>
+                                    <div><label>サイズ: <span id="sub-title-size-val">60</span>px</label><input id="sub-title-size" type="range" min="10" max="100" value="60" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"></div>
                                     <div><label>縁幅: <span id="sub-title-stroke-val">2</span>px</label><input id="sub-title-stroke" type="range" min="0" max="10" value="2" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"></div>
-                                    <div class="flex items-center"> <label class="mr-2">文字色</label> <input id="sub-title-color" type="color" value="#FFFFFF" class="w-full h-8 p-1 border border-gray-300 rounded-md"></div>
-                                    <div class="flex items-center"> <label class="mr-2">縁色</label> <input id="sub-title-stroke-color" type="color" value="#000000" class="w-full h-8 p-1 border border-gray-300 rounded-md"></div>
+                                    <div class="flex items-center"> <label class="mr-2 shrink-0">文字色</label> <input id="sub-title-color" type="color" value="#FFFFFF" class="w-full h-8 p-1 border border-gray-300 rounded-md"></div>
+                                    <div class="flex items-center"> <label class="mr-2 shrink-0">縁色</label> <input id="sub-title-stroke-color" type="color" value="#000000" class="w-full h-8 p-1 border border-gray-300 rounded-md"></div>
                                 </div>
                             </div>
                          </div>
+                    </div>
+
+                    <!-- 新しい切り抜き設定項目 -->
+                    <div class="lg:col-span-2 space-y-8">
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center"><i class="fas fa-cut mr-3 text-gray-500"></i>詳細切り抜き指示</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label for="start-time" class="block text-sm font-medium text-gray-700">開始時間 (MM:SS または HH:MM:SS)</label>
+                                    <input type="text" id="start-time" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="例: 01:30 または 00:01:30">
+                                </div>
+                                <div>
+                                    <label for="end-time" class="block text-sm font-medium text-gray-700">終了時間 (MM:SS または HH:MM:SS)</label>
+                                    <input type="text" id="end-time" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="例: 02:45 または 00:02:45">
+                                </div>
+                                <div>
+                                    <label for="keywords" class="block text-sm font-medium text-gray-700">切り抜きキーワード (カンマ区切り)</label>
+                                    <textarea id="keywords" rows="2" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="例: プロジェクト成功, 苦労, 乗り越えた瞬間"></textarea>
+                                </div>
+                                <div>
+                                    <label for="desired-duration" class="block text-sm font-medium text-gray-700">希望する最終的なクリップの長さ (秒)</label>
+                                    <input type="number" id="desired-duration" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="例: 45">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-6 rounded-lg shadow">
+                            <h3 class="text-lg font-semibold mb-4 flex items-center"><i class="fas fa-film mr-3 text-gray-500"></i>編集・スタイル設定</h3>
+                            <div class="space-y-4">
+                                <label class="flex items-center justify-between p-3 rounded-md hover:bg-gray-50 cursor-pointer">
+                                    <div>
+                                        <span class="font-medium text-gray-900">テロップ/字幕を追加</span>
+                                        <p class="text-sm text-gray-500">話している内容を字幕として表示します</p>
+                                    </div>
+                                    <div class="relative inline-block w-10 align-middle select-none transition duration-200 ease-in toggle-switch-bg rounded-full">
+                                        <input type="checkbox" id="addCaptionsToggle" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" checked/>
+                                        <label for="addCaptionsToggle" class="toggle-label"></label>
+                                    </div>
+                                </label>
+                                <div id="caption-settings-container">
+                                    <label for="highlight-keywords" class="block text-sm font-medium text-gray-700">テロップ強調キーワード (カンマ区切り)</label>
+                                    <textarea id="highlight-keywords" rows="1" class="w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500" placeholder="例: 諦めずに続けた, 成功"></textarea>
+                                </div>
+                                <div>
+                                    <label for="bgm-atmosphere" class="block text-sm font-medium text-gray-700">BGMの雰囲気</label>
+                                    <select id="bgm-atmosphere" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                        <option value="">なし</option>
+                                        <option value="positive">ポジティブ</option>
+                                        <option value="epic">壮大</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="camera-work" class="block text-sm font-medium text-gray-700">カメラワーク</label>
+                                    <select id="camera-work" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                        <option value="">なし</option>
+                                        <option value="zoom_on_emotion">感情に合わせてズーム</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Right Column: Execution and Status -->
                     <div class="lg:col-span-1">
                         <div class="bg-white p-6 rounded-lg shadow sticky top-24">
                             <h3 class="text-lg font-semibold mb-4 flex items-center"><i class="fas fa-play-circle mr-3 text-gray-500"></i>処理実行</h3>
-                            <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-r-lg mb-4">
-                                <div class="flex justify-between text-sm">
-                                    <span class="font-semibold text-blue-800">推定コスト</span>
-                                    <span id="estimated-cost" class="font-bold text-blue-800">$0.00</span>
-                                </div>
-                                 <div class="flex justify-between text-sm mt-1">
-                                    <span class="font-semibold text-blue-800">推定時間</span>
-                                    <span id="estimated-time" class="font-bold text-blue-800">0-0分</span>
-                                </div>
+                            
+                            <div class="mb-6 p-4 bg-gray-50 rounded-lg border">
+                                <h4 class="font-semibold text-gray-800 mb-3 flex items-center">
+                                    <img src="https://www.gstatic.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png" alt="Google Logo" class="h-4 mr-2">
+                                    Gemini AI システム情報
+                                </h4>
+                                <ul class="space-y-2 text-sm text-gray-600">
+                                    <li class="flex items-start">
+                                        <i class="fas fa-clock w-4 mt-1 mr-2 text-red-500"></i>
+                                        <div>
+                                            <span class="font-semibold">動画の長さ: <span class="text-red-600">約5分まで</span></span>
+                                            <p class="text-xs text-gray-500">APIの10MB制限により、5分を超える動画は処理できません。</p>
+                                        </div>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fas fa-yen-sign w-4 mt-1 mr-2 text-gray-400"></i>
+                                        <div>
+                                            <span class="font-semibold">推定コスト:</span> Gemini AIによる分析と編集プラン生成により、追加コストが発生します。AIリフレーミング（顔追跡など）を有効にする場合、さらに高額になる可能性があります。
+                                            <p class="text-xs text-gray-500">Speech-to-Text、Natural Language、Gemini APIの利用料が発生します。</p>
+                                        </div>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fas fa-bolt w-4 mt-1 mr-2 text-gray-400"></i>
+                                        <div>
+                                            <span class="font-semibold">推定時間:</span>
+                                            <p class="text-xs text-gray-500">Gemini AIによる分析と複雑な動画処理のため、動画の長さの数倍の時間がかかる場合があります。</p>
+                                        </div>
+                                    </li>
+                                    <li class="flex items-start">
+                                        <i class="fas fa-check-circle w-4 mt-1 mr-2 text-green-500"></i>
+                                        <div>
+                                            <span class="font-semibold">利用可能機能:</span> AIジャンプカット、高視認性テロップ、BGMミキシング、AIリフレーミング（ズームイン）
+                                        </div>
+                                    </li>
+                                </ul>
                             </div>
+                            
                             <div class="text-sm text-gray-600 space-y-2 mb-4">
                                 <p class="font-semibold">設定サマリー:</p>
-                                <ul id="summary-list" class="list-disc list-inside text-xs">
-                                </ul>
+                                <ul id="summary-list" class="space-y-1"></ul>
                             </div>
                             <button id="process-button" class="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 text-lg font-bold disabled:bg-gray-400 disabled:cursor-not-allowed">
                                 <i class="fas fa-cogs mr-2"></i>処理開始
                             </button>
-                            <p class="text-xs text-gray-500 mt-2 text-center">動画URLを入力またはファイルをアップロードして、設定を調整後に「処理開始」ボタンを押してください</p>
-
                             <div id="processing-status" class="mt-6 hidden">
-                                 <h3 class="text-lg font-semibold mb-4 flex items-center"><i class="fas fa-tasks mr-3 text-gray-500"></i>処理状況</h3>
-                                 <div id="processing-overall-status" class="flex justify-between items-center mb-2">
-                                     <p>全体進捗</p>
-                                     <span id="progress-percentage" class="font-bold text-blue-600">0%</span>
-                                 </div>
-                                 <div class="w-full bg-gray-200 rounded-full h-2.5">
-                                    <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full processing-bar-inner" style="width: 0%"></div>
-                                 </div>
-                                 <p id="processing-message" class="text-sm text-center text-gray-600 mt-2">処理を開始しています...</p>
+                                <h3 class="text-lg font-semibold mb-4 flex items-center"><i class="fas fa-terminal mr-3 text-gray-500"></i>リアルタイムログ</h3>
+                                <div class="bg-gray-900 rounded-lg p-4 h-80 overflow-y-auto font-mono text-sm">
+                                    <pre id="status-log" class="text-white whitespace-pre-wrap"></pre>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -291,12 +339,13 @@
             </div>
             
             <div id="results-section" class="mt-12 hidden">
-                <h2 class="text-2xl font-semibold mb-6">生成されたクリップ</h2>
-                <div class="flex justify-end mb-4 space-x-2">
-                    <button class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"><i class="fas fa-file-archive mr-2"></i>まとめてダウンロード (ZIP + CSV)</button>
-                    <button id="reset-button" class="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300"><i class="fas fa-plus mr-2"></i>新しい処理を開始</button>
+                <div class="flex flex-wrap justify-between items-center mb-6 gap-4">
+                    <h2 class="text-2xl font-semibold">生成されたクリップ</h2>
+                    <div class="flex justify-end space-x-2">
+                        <button id="reset-button" class="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300"><i class="fas fa-plus mr-2"></i>新しい処理を開始</button>
+                    </div>
                 </div>
-                <div id="clips-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div id="clips-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 </div>
             </div>
         </main>
