@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+JP:wght@400;700;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { scroll-behavior: smooth; font-family: 'Inter', 'Noto Sans JP', sans-serif; }
         .slider-track { top: 50%; transform: translateY(-50%); }
@@ -44,6 +45,18 @@
                     <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">サインイン</button>
                     <p id="login-error" class="text-red-500 text-sm mt-2 text-center h-4"></p>
                 </form>
+
+                <div class="my-4 flex items-center">
+                    <div class="flex-grow border-t border-gray-300"></div>
+                    <span class="flex-shrink mx-4 text-gray-500 text-sm">または</span>
+                    <div class="flex-grow border-t border-gray-300"></div>
+                </div>
+
+                <a href="/api/v1/auth/google" id="google-login-button" class="w-full bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-50 flex items-center justify-center transition-all duration-300">
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google icon" class="w-5 h-5 mr-2">
+                    Googleでサインイン
+                </a>
+
                 <p class="text-center text-sm text-gray-600 mt-4">
                     アカウントをお持ちでないですか？ <span id="show-register-form" class="font-medium text-blue-600 hover:text-blue-500 cursor-pointer">新規登録</span>
                 </p>
@@ -346,6 +359,14 @@
                     </div>
                 </div>
                 <div id="clips-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                </div>
+
+                <!-- Analysis Graph Section -->
+                <div id="analysis-graph-container" class="mt-12 hidden">
+                    <h3 class="text-xl font-semibold mb-4">AIによる盛り上がり分析グラフ</h3>
+                    <div class="bg-white p-4 rounded-lg shadow">
+                        <canvas id="excitement-chart"></canvas>
+                    </div>
                 </div>
             </div>
         </main>

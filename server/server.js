@@ -13,6 +13,7 @@ const ffmpeg = require('fluent-ffmpeg');
 const { SpeechClient } = require('@google-cloud/speech');
 const { Storage } = require('@google-cloud/storage');
 const { LanguageServiceClient } = require('@google-cloud/language');
+const { google } = require('googleapis');
 const util = require('util');
 const ffprobe = require('ffprobe-static');
 
@@ -37,6 +38,23 @@ const languageClient = new LanguageServiceClient({ keyFilename: keyFilePath });
 const BUCKET_NAME = 'clipersworkstrage';
 const JWT_SECRET = 'your-super-secret-key-for-jwt';
 const GOOGLE_API_KEY = 'AIzaSyBnBhi9abL2VULcXSO12WSw47UE7T5xRIs';
+
+// --- Google OAuth 設定 ---
+// ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+// ★ 重要: これらの値は、Renderの環境変数に設定してください。           ★
+// ★ GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, APP_BASE_URL               ★
+// ★ APP_BASE_URLは 'https://your-app-name.onrender.com' のような形式です ★
+// ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 'YOUR_GOOGLE_CLIENT_ID';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || 'YOUR_GOOGLE_CLIENT_SECRET';
+const APP_BASE_URL = process.env.APP_BASE_URL || `http://localhost:${PORT}`;
+const REDIRECT_URI = `${APP_BASE_URL}/api/v1/auth/google/callback`;
+
+const oauth2Client = new google.auth.OAuth2(
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    REDIRECT_URI
+);
 
 // --- ディレクトリ設定 ---
 const TEMP_DIR = path.join(__dirname, 'temp');
@@ -125,6 +143,71 @@ async function main() {
         const accessToken = jwt.sign({ email: user.email, id: user.id }, JWT_SECRET, { expiresIn: '24h' });
         res.json({ token: accessToken });
     });
+
+    router.get('/auth/google', (req, res) => {
+        const scopes = [
+            'https://www.googleapis.com/auth/userinfo.profile',
+            'https://www.googleapis.com/auth/userinfo.email',
+            'https://www.googleapis.com/auth/youtube.readonly'
+        ];
+
+        const url = oauth2Client.generateAuthUrl({
+            access_type: 'offline',
+            scope: scopes,
+            prompt: 'consent' // refresh_tokenを毎回確実に取得するために必要
+        });
+        res.redirect(url);
+    });
+
+    router.get('/auth/google/callback', async (req, res) => {
+        const { code } = req.query;
+
+        try {
+            const { tokens } = await oauth2Client.getToken(code);
+            oauth2Client.setCredentials(tokens);
+
+            const oauth2 = google.oauth2({
+                auth: oauth2Client,
+                version: 'v2'
+            });
+            const { data: userInfo } = await oauth2.userinfo.get();
+
+            if (!userInfo.email) {
+                return res.status(400).send('Could not retrieve email from Google.');
+            }
+
+            await db.read();
+            let user = db.data.users.find(u => u.email === userInfo.email);
+
+            if (user) {
+                // 既存ユーザーの場合、トークンを更新
+                user.googleTokens = tokens;
+            } else {
+                // 新規ユーザーの場合、作成
+                user = {
+                    id: db.data.users.length + 1,
+                    email: userInfo.email,
+                    name: userInfo.name,
+                    googleTokens: tokens,
+                    createdAt: new Date()
+                };
+                db.data.users.push(user);
+            }
+
+            await db.write();
+
+            // アプリケーション用のJWTを生成
+            const appToken = jwt.sign({ email: user.email, id: user.id }, JWT_SECRET, { expiresIn: '24h' });
+
+            // フロントエンドにリダイレクトし、トークンを渡す
+            // (クエリパラメータで渡すのは一例。よりセキュアな方法も検討可能)
+            res.redirect(`/?token=${appToken}`);
+
+        } catch (error) {
+            console.error('Google OAuth callback error:', error);
+            res.status(500).send('Authentication failed.');
+        }
+    });
     const extractYouTubeID = (url) => { const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*$/; const match = url.match(regExp); return (match && match[2].length === 11) ? match[2] : null; };
 
     const parseTimeToSeconds = (timeString) => {
@@ -148,21 +231,38 @@ async function main() {
             return res.status(400).json({ message: '無効なYouTube URLです。' });
         }
 
-        let tempCookiePath = null;
         try {
-            const cookiesFilePath = '/etc/secrets/cookies.txt';
+            // ユーザーのGoogle認証トークンを取得
+            await db.read();
+            const user = db.data.users.find(u => u.id === req.user.id);
+            if (!user || !user.googleTokens || !user.googleTokens.access_token) {
+                return res.status(401).json({ message: 'Google認証が必要です。Googleアカウントでログインしてください。' });
+            }
+
+            // OAuth2クライアントにトークンを設定
+            const userAuth = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, REDIRECT_URI);
+            userAuth.setCredentials(user.googleTokens);
+
+            // トークンの有効期限を確認し、必要であればリフレッシュ
+            const accessTokenInfo = await userAuth.getAccessToken();
+            const accessToken = accessTokenInfo.token;
+
+            // リフレッシュされた可能性のあるトークンを保存
+            if (accessToken !== user.googleTokens.access_token) {
+                user.googleTokens.access_token = accessToken;
+                if (accessTokenInfo.res && accessTokenInfo.res.data && accessTokenInfo.res.data.expiry_date) {
+                    user.googleTokens.expiry_date = accessTokenInfo.res.data.expiry_date;
+                }
+                await db.write();
+            }
+
             const ytdlpArgs = [
                 url,
                 '--dump-json',
                 '--no-playlist',
-                '--skip-download'
+                '--skip-download',
+                '--oauth2-access-token', accessToken
             ];
-
-            if (fs.existsSync(cookiesFilePath)) {
-                tempCookiePath = path.join(TEMP_DIR, `cookies_${uuidv4()}.txt`);
-                fs.copyFileSync(cookiesFilePath, tempCookiePath);
-                ytdlpArgs.push('--cookies', tempCookiePath);
-            }
 
             // yt-dlpで動画情報を取得 (ダウンロードはしない)
             const ytDlpInfo = await ytDlpWrap.execPromise(ytdlpArgs);
@@ -183,10 +283,6 @@ async function main() {
         } catch (error) {
             console.error('動画メタデータ取得エラー:', error);
             res.status(500).json({ message: `動画メタデータの取得に失敗しました: \nError code: ${error.message}\n\nStderr:\n${error.stderr}` });
-        } finally {
-            if (tempCookiePath && fs.existsSync(tempCookiePath)) {
-                fs.unlinkSync(tempCookiePath);
-            }
         }
     });
 
@@ -390,9 +486,35 @@ async function main() {
     const processJob = async (jobId) => {
         const job = jobs.get(jobId);
         if (!job) return;
-        let downloadedFilePath, audioFilePath, audioFileNameInGcs, tempCookiePath;
+        let downloadedFilePath, audioFilePath, audioFileNameInGcs;
         try {
-            job.status = 'processing'; job.progress = 5; job.statusMessage = '動画のダウンロードを開始します...'; pushUpdateToClient(jobId);
+            job.status = 'processing'; job.progress = 5; job.statusMessage = '認証情報を確認しています...'; pushUpdateToClient(jobId);
+
+            // ユーザーのGoogle認証トークンを取得
+            await db.read();
+            const user = db.data.users.find(u => u.id === job.userId);
+            if (!user || !user.googleTokens || !user.googleTokens.access_token) {
+                throw new Error('Google認証が必要です。Googleアカウントでログインしてください。');
+            }
+
+            // OAuth2クライアントにトークンを設定
+            const userAuth = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, REDIRECT_URI);
+            userAuth.setCredentials(user.googleTokens);
+
+            // トークンの有効期限を確認し、必要であればリフレッシュ
+            const accessTokenInfo = await userAuth.getAccessToken();
+            const accessToken = accessTokenInfo.token;
+
+            // リフレッシュされた可能性のあるトークンを保存
+            if (accessToken !== user.googleTokens.access_token) {
+                user.googleTokens.access_token = accessToken;
+                if (accessTokenInfo.res && accessTokenInfo.res.data && accessTokenInfo.res.data.expiry_date) {
+                    user.googleTokens.expiry_date = accessTokenInfo.res.data.expiry_date;
+                }
+                await db.write();
+            }
+            
+            job.statusMessage = '動画のダウンロードを開始します...'; pushUpdateToClient(jobId);
             
             const fontFileName = 'NotoSansJP-VariableFont_wght.ttf';
             const fontPath = path.join(__dirname, 'fonts', fontFileName);
@@ -402,20 +524,14 @@ async function main() {
             const uniqueId = Date.now();
             downloadedFilePath = path.join(DOWNLOAD_DIR, `${uniqueId}.mp4`);
 
-            const cookiesFilePath = '/etc/secrets/cookies.txt';
             const ytdlpArgs = [
                 job.sourceUrl,
                 '-f', 'bestvideo+bestaudio',
                 '--merge-output-format', 'mp4',
                 '--no-playlist',
+                '--oauth2-access-token', accessToken,
                 '-o', downloadedFilePath,
             ];
-
-            if (fs.existsSync(cookiesFilePath)) {
-                tempCookiePath = path.join(TEMP_DIR, `cookies_${job.jobId}.txt`);
-                fs.copyFileSync(cookiesFilePath, tempCookiePath);
-                ytdlpArgs.push('--cookies', tempCookiePath);
-            }
 
             await ytDlpWrap.execPromise(ytdlpArgs);
 
@@ -609,7 +725,7 @@ async function main() {
             pushUpdateToClient(jobId);
         } finally {
             job.statusMessage = '一時ファイルをクリーンアップしています...'; pushUpdateToClient(jobId);
-            [downloadedFilePath, audioFilePath, tempCookiePath].forEach(fp => { if (fp && fs.existsSync(fp)) { fs.unlink(fp, err => { if(err) console.error(`一時ファイルの削除に失敗: ${fp}`); }); } });
+            [downloadedFilePath, audioFilePath].forEach(fp => { if (fp && fs.existsSync(fp)) { fs.unlink(fp, err => { if(err) console.error(`一時ファイルの削除に失敗: ${fp}`); }); } });
             if (audioFileNameInGcs) {
                 try { await storage.bucket(BUCKET_NAME).file(audioFileNameInGcs).delete(); } catch (gcsError) { console.error(`GCSファイルの削除に失敗:`, gcsError); }
             }

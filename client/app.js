@@ -21,6 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetButton = document.getElementById('reset-button');
     const titleSettingsContainer = document.getElementById('title-settings-container');
     const statusLog = document.getElementById('status-log');
+    const analysisGraphContainer = document.getElementById('analysis-graph-container');
+    const excitementChartCanvas = document.getElementById('excitement-chart');
 
     const startTimeInput = document.getElementById('start-time');
     const endTimeInput = document.getElementById('end-time');
@@ -205,6 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetUI = () => {
         if (settingsSection) settingsSection.classList.remove('hidden');
         if (resultsSection) resultsSection.classList.add('hidden');
+        if (analysisGraphContainer) analysisGraphContainer.classList.add('hidden');
         const processingStatus = document.getElementById('processing-status');
         if (processingStatus) processingStatus.classList.add('hidden');
         if (statusLog) statusLog.innerHTML = '';
@@ -456,14 +459,97 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const fetchResults = async (jobId) => {
         try {
-            const data = await apiFetch(`/jobs/${jobId}/results`);
+            // クリップ情報と分析情報を並行して取得
+            const [clipsData, analysisData] = await Promise.all([
+                apiFetch(`/jobs/${jobId}/results`),
+                apiFetch(`/jobs/${jobId}/analysis`).catch(e => {
+                    console.warn('Analysis data could not be fetched, graph will not be shown.');
+                    return null; // 分析データがなくてもエラーにしない
+                })
+            ]);
+
             if (settingsSection) settingsSection.classList.add('hidden');
             if (resultsSection) resultsSection.classList.remove('hidden');
             if (resultsSection) resultsSection.scrollIntoView({ behavior: 'smooth' });
-            renderClips(data.clips);
+            
+            renderClips(clipsData.clips);
+
+            if (analysisData && analysisGraphContainer) {
+                analysisGraphContainer.classList.remove('hidden');
+                renderAnalysisChart(analysisData);
+            }
+
         } catch (error) {
             alert(`結果の取得に失敗: ${error.message}`);
         }
+    };
+
+    let chartInstance = null;
+    const renderAnalysisChart = (analysisData) => {
+        if (!excitementChartCanvas) return;
+        const { excitementScoreTimeline, highlights } = analysisData;
+
+        const ctx = excitementChartCanvas.getContext('2d');
+        if (chartInstance) {
+            chartInstance.destroy();
+        }
+
+        const labels = excitementScoreTimeline.map((_, i) => i);
+        const highlightAnnotations = highlights.map(h => ({
+            type: 'box',
+            xMin: h.startTime,
+            xMax: h.startTime + h.duration,
+            backgroundColor: 'rgba(255, 215, 0, 0.2)',
+            borderColor: 'rgba(255, 215, 0, 0.5)',
+            borderWidth: 1,
+        }));
+
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: '盛り上がりスコア',
+                    data: excitementScoreTimeline,
+                    borderColor: 'rgb(59, 130, 246)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 0,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: '時間 (秒)'
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'スコア'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    annotation: {
+                        annotations: highlightAnnotations
+                    }
+                }
+            }
+        });
     };
     
     const initializeSliders = () => {
@@ -608,6 +694,15 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // --- アプリケーション起動 ---
     try {
+        // Google OAuthリダイレクトからのトークンを処理
+        const urlParams = new URLSearchParams(window.location.search);
+        const tokenFromUrl = urlParams.get('token');
+        if (tokenFromUrl) {
+            localStorage.setItem('authToken', tokenFromUrl);
+            // URLからトークンを削除してクリーンな状態にする
+            history.replaceState(null, '', window.location.pathname);
+        }
+
         if (showRegisterFormLink) {
             showRegisterFormLink.addEventListener('click', (e) => { 
                 e.preventDefault(); 
