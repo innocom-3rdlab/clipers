@@ -148,6 +148,7 @@ async function main() {
             return res.status(400).json({ message: '無効なYouTube URLです。' });
         }
 
+        let tempCookiePath = null;
         try {
             const cookiesFilePath = '/etc/secrets/cookies.txt';
             const ytdlpArgs = [
@@ -158,7 +159,9 @@ async function main() {
             ];
 
             if (fs.existsSync(cookiesFilePath)) {
-                ytdlpArgs.push('--cookies', cookiesFilePath);
+                tempCookiePath = path.join(TEMP_DIR, `cookies_${uuidv4()}.txt`);
+                fs.copyFileSync(cookiesFilePath, tempCookiePath);
+                ytdlpArgs.push('--cookies', tempCookiePath);
             }
 
             // yt-dlpで動画情報を取得 (ダウンロードはしない)
@@ -181,7 +184,9 @@ async function main() {
             console.error('動画メタデータ取得エラー:', error);
             res.status(500).json({ message: `動画メタデータの取得に失敗しました: \nError code: ${error.message}\n\nStderr:\n${error.stderr}` });
         } finally {
-            // 一時ファイルは生成されないため、クリーンアップは不要
+            if (tempCookiePath && fs.existsSync(tempCookiePath)) {
+                fs.unlinkSync(tempCookiePath);
+            }
         }
     });
 
@@ -385,7 +390,7 @@ async function main() {
     const processJob = async (jobId) => {
         const job = jobs.get(jobId);
         if (!job) return;
-        let downloadedFilePath, audioFilePath, audioFileNameInGcs;
+        let downloadedFilePath, audioFilePath, audioFileNameInGcs, tempCookiePath;
         try {
             job.status = 'processing'; job.progress = 5; job.statusMessage = '動画のダウンロードを開始します...'; pushUpdateToClient(jobId);
             
@@ -407,7 +412,9 @@ async function main() {
             ];
 
             if (fs.existsSync(cookiesFilePath)) {
-                ytdlpArgs.push('--cookies', cookiesFilePath);
+                tempCookiePath = path.join(TEMP_DIR, `cookies_${job.jobId}.txt`);
+                fs.copyFileSync(cookiesFilePath, tempCookiePath);
+                ytdlpArgs.push('--cookies', tempCookiePath);
             }
 
             await ytDlpWrap.execPromise(ytdlpArgs);
@@ -602,7 +609,7 @@ async function main() {
             pushUpdateToClient(jobId);
         } finally {
             job.statusMessage = '一時ファイルをクリーンアップしています...'; pushUpdateToClient(jobId);
-            [downloadedFilePath, audioFilePath].forEach(fp => { if (fp && fs.existsSync(fp)) { fs.unlink(fp, err => { if(err) console.error(`一時ファイルの削除に失敗: ${fp}`); }); } });
+            [downloadedFilePath, audioFilePath, tempCookiePath].forEach(fp => { if (fp && fs.existsSync(fp)) { fs.unlink(fp, err => { if(err) console.error(`一時ファイルの削除に失敗: ${fp}`); }); } });
             if (audioFileNameInGcs) {
                 try { await storage.bucket(BUCKET_NAME).file(audioFileNameInGcs).delete(); } catch (gcsError) { console.error(`GCSファイルの削除に失敗:`, gcsError); }
             }
