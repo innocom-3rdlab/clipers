@@ -19,8 +19,6 @@
     "lowdb": "^7.0.1",
     "uuid": "^9.0.1",
     "ws": "^8.18.3",
-    "youtube-dl-exec": "^3.0.4",
-    "yt-dlp-wrap": "^2.3.12",
-    "ytdl-core": "^4.11.5"
+    "yt-dlp-wrap": "^2.3.12"
   }
 }
