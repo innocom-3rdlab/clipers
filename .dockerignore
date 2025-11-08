@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+.dockerignore
+
+# Dependencies
+node_modules
+server/node_modules
+
+# Build/Temp outputs
+server/temp/
+server/downloads/
+server/models/
+server/clips/
+
+# OS/Editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Media files
+*.mp4
+*.flac
+
+# Logs
+*.log
+server/logs/
+
+# Data/Credentials
+server/db.json
+server/google-credentials.json
+server/clip_*.mp4
+
+# Env
+.env
