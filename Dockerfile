@@ -1,12 +1,12 @@
 # Stage 1: Base image with Node.js and system dependencies
 FROM node:18-bullseye-slim
 
-# Install Python and yt-dlp for video downloading
-# Also install ffmpeg which is required for video processing
+# Install Python, pip, yt-dlp, and ffmpeg
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
-    yt-dlp \
+    python3-pip \
     ffmpeg \
+    && pip3 install --no-cache-dir yt-dlp \
     && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory
