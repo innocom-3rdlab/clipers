@@ -56,6 +56,14 @@ const oauth2Client = new google.auth.OAuth2(
     REDIRECT_URI
 );
 
+// --- 起動時の設定値ログ出力 ---
+console.log("--- Google OAuth Configuration ---");
+console.log("GOOGLE_CLIENT_ID:", GOOGLE_CLIENT_ID.startsWith('YOUR_') ? "MISSING/Placeholder!" : "Loaded");
+console.log("GOOGLE_CLIENT_SECRET:", GOOGLE_CLIENT_SECRET.startsWith('YOUR_') ? "MISSING/Placeholder!" : "Loaded");
+console.log("APP_BASE_URL:", APP_BASE_URL);
+console.log("Full Redirect URI:", REDIRECT_URI);
+console.log("---------------------------------");
+
 // --- ディレクトリ設定 ---
 const TEMP_DIR = path.join(__dirname, 'temp');
 const DOWNLOAD_DIR = path.join(TEMP_DIR, 'downloads');
