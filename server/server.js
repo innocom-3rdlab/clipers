@@ -149,13 +149,20 @@ async function main() {
         }
 
         try {
-            // yt-dlpで動画情報を取得 (ダウンロードはしない)
-            const ytDlpInfo = await ytDlpWrap.execPromise([
+            const cookiesFilePath = '/etc/secrets/cookies.txt';
+            const ytdlpArgs = [
                 url,
                 '--dump-json',
                 '--no-playlist',
                 '--skip-download'
-            ]);
+            ];
+
+            if (fs.existsSync(cookiesFilePath)) {
+                ytdlpArgs.push('--cookies', cookiesFilePath);
+            }
+
+            // yt-dlpで動画情報を取得 (ダウンロードはしない)
+            const ytDlpInfo = await ytDlpWrap.execPromise(ytdlpArgs);
             const videoInfo = JSON.parse(ytDlpInfo);
             const title = videoInfo.title;
             const duration = videoInfo.duration; // 秒単位
@@ -172,7 +179,7 @@ async function main() {
 
         } catch (error) {
             console.error('動画メタデータ取得エラー:', error);
-            res.status(500).json({ message: `動画メタデータの取得に失敗しました: ${error.message}` });
+            res.status(500).json({ message: `動画メタデータの取得に失敗しました: \nError code: ${error.message}\n\nStderr:\n${error.stderr}` });
         } finally {
             // 一時ファイルは生成されないため、クリーンアップは不要
         }
@@ -389,13 +396,21 @@ async function main() {
             
             const uniqueId = Date.now();
             downloadedFilePath = path.join(DOWNLOAD_DIR, `${uniqueId}.mp4`);
-            await ytDlpWrap.execPromise([
+
+            const cookiesFilePath = '/etc/secrets/cookies.txt';
+            const ytdlpArgs = [
                 job.sourceUrl,
                 '-f', 'bestvideo+bestaudio',
                 '--merge-output-format', 'mp4',
                 '--no-playlist',
                 '-o', downloadedFilePath,
-            ]);
+            ];
+
+            if (fs.existsSync(cookiesFilePath)) {
+                ytdlpArgs.push('--cookies', cookiesFilePath);
+            }
+
+            await ytDlpWrap.execPromise(ytdlpArgs);
 
             job.statusMessage = 'ダウンロード済み動画の音声トラックを確認中...';
             pushUpdateToClient(jobId);
