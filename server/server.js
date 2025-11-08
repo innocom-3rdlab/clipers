@@ -231,51 +231,54 @@ async function main() {
             return res.status(400).json({ message: '無効なYouTube URLです。' });
         }
 
+        let tempCookiePath = null;
         try {
-            // ユーザーのGoogle認証トークンを取得
             await db.read();
             const user = db.data.users.find(u => u.id === req.user.id);
-            if (!user || !user.googleTokens || !user.googleTokens.access_token) {
-                return res.status(401).json({ message: 'Google認証が必要です。Googleアカウントでログインしてください。' });
-            }
-
-            // OAuth2クライアントにトークンを設定
-            const userAuth = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, REDIRECT_URI);
-            userAuth.setCredentials(user.googleTokens);
-
-            // トークンの有効期限を確認し、必要であればリフレッシュ
-            const accessTokenInfo = await userAuth.getAccessToken();
-            const accessToken = accessTokenInfo.token;
-
-            // リフレッシュされた可能性のあるトークンを保存
-            if (accessToken !== user.googleTokens.access_token) {
-                user.googleTokens.access_token = accessToken;
-                if (accessTokenInfo.res && accessTokenInfo.res.data && accessTokenInfo.res.data.expiry_date) {
-                    user.googleTokens.expiry_date = accessTokenInfo.res.data.expiry_date;
-                }
-                await db.write();
-            }
-
+            
             const ytdlpArgs = [
                 url,
                 '--dump-json',
                 '--no-playlist',
-                '--skip-download',
-                '--oauth2-access-token', accessToken
+                '--skip-download'
             ];
 
-            // yt-dlpで動画情報を取得 (ダウンロードはしない)
+            // 優先: Google OAuthトークンを使用
+            if (user && user.googleTokens && user.googleTokens.access_token) {
+                const userAuth = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, REDIRECT_URI);
+                userAuth.setCredentials(user.googleTokens);
+                const accessTokenInfo = await userAuth.getAccessToken();
+                const accessToken = accessTokenInfo.token;
+
+                if (accessToken !== user.googleTokens.access_token) {
+                    user.googleTokens.access_token = accessToken;
+                    if (accessTokenInfo.res && accessTokenInfo.res.data && accessTokenInfo.res.data.expiry_date) {
+                        user.googleTokens.expiry_date = accessTokenInfo.res.data.expiry_date;
+                    }
+                    await db.write();
+                }
+                ytdlpArgs.push('--oauth2-access-token', accessToken);
+            } else {
+                // フォールバック: グローバルなCookieファイルを使用
+                const cookiesFilePath = '/etc/secrets/cookies.txt';
+                if (fs.existsSync(cookiesFilePath)) {
+                    tempCookiePath = path.join(TEMP_DIR, `cookies_${uuidv4()}.txt`);
+                    fs.copyFileSync(cookiesFilePath, tempCookiePath);
+                    ytdlpArgs.push('--cookies', tempCookiePath);
+                }
+            }
+
+            // yt-dlpで動画情報を取得
             const ytDlpInfo = await ytDlpWrap.execPromise(ytdlpArgs);
             const videoInfo = JSON.parse(ytDlpInfo);
             const title = videoInfo.title;
-            const duration = videoInfo.duration; // 秒単位
+            const duration = videoInfo.duration;
 
-            // yt-dlpのdump-jsonにはaudio_codec情報が含まれるので、それを利用
             const hasAudioTrack = videoInfo.audio_codec ? true : false;
 
             res.json({
                 title: title,
-                duration: duration, // 秒
+                duration: duration,
                 hasAudioTrack: hasAudioTrack,
                 message: '動画メタデータを取得しました。'
             });
@@ -283,6 +286,10 @@ async function main() {
         } catch (error) {
             console.error('動画メタデータ取得エラー:', error);
             res.status(500).json({ message: `動画メタデータの取得に失敗しました: \nError code: ${error.message}\n\nStderr:\n${error.stderr}` });
+        } finally {
+            if (tempCookiePath && fs.existsSync(tempCookiePath)) {
+                fs.unlinkSync(tempCookiePath);
+            }
         }
     });
 
@@ -486,32 +493,41 @@ async function main() {
     const processJob = async (jobId) => {
         const job = jobs.get(jobId);
         if (!job) return;
-        let downloadedFilePath, audioFilePath, audioFileNameInGcs;
+        let downloadedFilePath, audioFilePath, audioFileNameInGcs, tempCookiePath;
         try {
             job.status = 'processing'; job.progress = 5; job.statusMessage = '認証情報を確認しています...'; pushUpdateToClient(jobId);
 
-            // ユーザーのGoogle認証トークンを取得
             await db.read();
             const user = db.data.users.find(u => u.id === job.userId);
-            if (!user || !user.googleTokens || !user.googleTokens.access_token) {
-                throw new Error('Google認証が必要です。Googleアカウントでログインしてください。');
-            }
+            
+            const ytdlpArgs = [
+                job.sourceUrl,
+                '-f', 'bestvideo+bestaudio',
+                '--merge-output-format', 'mp4',
+                '--no-playlist',
+            ];
 
-            // OAuth2クライアントにトークンを設定
-            const userAuth = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, REDIRECT_URI);
-            userAuth.setCredentials(user.googleTokens);
+            if (user && user.googleTokens && user.googleTokens.access_token) {
+                const userAuth = new google.auth.OAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, REDIRECT_URI);
+                userAuth.setCredentials(user.googleTokens);
+                const accessTokenInfo = await userAuth.getAccessToken();
+                const accessToken = accessTokenInfo.token;
 
-            // トークンの有効期限を確認し、必要であればリフレッシュ
-            const accessTokenInfo = await userAuth.getAccessToken();
-            const accessToken = accessTokenInfo.token;
-
-            // リフレッシュされた可能性のあるトークンを保存
-            if (accessToken !== user.googleTokens.access_token) {
-                user.googleTokens.access_token = accessToken;
-                if (accessTokenInfo.res && accessTokenInfo.res.data && accessTokenInfo.res.data.expiry_date) {
-                    user.googleTokens.expiry_date = accessTokenInfo.res.data.expiry_date;
+                if (accessToken !== user.googleTokens.access_token) {
+                    user.googleTokens.access_token = accessToken;
+                    if (accessTokenInfo.res && accessTokenInfo.res.data && accessTokenInfo.res.data.expiry_date) {
+                        user.googleTokens.expiry_date = accessTokenInfo.res.data.expiry_date;
+                    }
+                    await db.write();
                 }
-                await db.write();
+                ytdlpArgs.push('--oauth2-access-token', accessToken);
+            } else {
+                const cookiesFilePath = '/etc/secrets/cookies.txt';
+                if (fs.existsSync(cookiesFilePath)) {
+                    tempCookiePath = path.join(TEMP_DIR, `cookies_${job.jobId}.txt`);
+                    fs.copyFileSync(cookiesFilePath, tempCookiePath);
+                    ytdlpArgs.push('--cookies', tempCookiePath);
+                }
             }
             
             job.statusMessage = '動画のダウンロードを開始します...'; pushUpdateToClient(jobId);
@@ -523,15 +539,7 @@ async function main() {
             
             const uniqueId = Date.now();
             downloadedFilePath = path.join(DOWNLOAD_DIR, `${uniqueId}.mp4`);
-
-            const ytdlpArgs = [
-                job.sourceUrl,
-                '-f', 'bestvideo+bestaudio',
-                '--merge-output-format', 'mp4',
-                '--no-playlist',
-                '--oauth2-access-token', accessToken,
-                '-o', downloadedFilePath,
-            ];
+            ytdlpArgs.push('-o', downloadedFilePath);
 
             await ytDlpWrap.execPromise(ytdlpArgs);
 
@@ -586,7 +594,6 @@ async function main() {
                 excitementScoreTimeline = analysisResult.excitementScoreTimeline || [];
                 generatedTitle = analysisResult.generatedTitle || 'AI生成タイトル';
                 
-                // フロントエンドでグラフ表示するために分析データを保存
                 job.analysisData = {
                     excitementScoreTimeline,
                     detailedTranscript: fullDetailedTranscript,
@@ -725,7 +732,7 @@ async function main() {
             pushUpdateToClient(jobId);
         } finally {
             job.statusMessage = '一時ファイルをクリーンアップしています...'; pushUpdateToClient(jobId);
-            [downloadedFilePath, audioFilePath].forEach(fp => { if (fp && fs.existsSync(fp)) { fs.unlink(fp, err => { if(err) console.error(`一時ファイルの削除に失敗: ${fp}`); }); } });
+            [downloadedFilePath, audioFilePath, tempCookiePath].forEach(fp => { if (fp && fs.existsSync(fp)) { fs.unlink(fp, err => { if(err) console.error(`一時ファイルの削除に失敗: ${fp}`); }); } });
             if (audioFileNameInGcs) {
                 try { await storage.bucket(BUCKET_NAME).file(audioFileNameInGcs).delete(); } catch (gcsError) { console.error(`GCSファイルの削除に失敗:`, gcsError); }
             }
