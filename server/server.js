@@ -643,6 +643,18 @@ async function main() {
                     const complexFilter = [];
                     let videoChain = '[0:v]scale=w=1080:h=-1,pad=w=1080:h=1920:x=(ow-iw)/2:y=(oh-ih)/2:color=black';
 
+                    // AIズームの実装
+                    if (job.settings.cameraWork === 'zoom_on_emotion' && excitementScoreTimeline.length > 0) {
+                        const clipStartSecond = Math.floor(actualStartTime);
+                        const clipEndSecond = Math.ceil(actualStartTime + actualDuration);
+                        const clipScores = excitementScoreTimeline.slice(clipStartSecond, clipEndSecond);
+                        const avgScore = clipScores.reduce((a, b) => a + b, 0) / clipScores.length;
+                        const excitementThreshold = 15; // この閾値は調整可能
+                        if (avgScore > excitementThreshold) {
+                            videoChain += ",zoompan=z='min(zoom+0.001,1.5)':d=1:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'";
+                        }
+                    }
+
                     if (generatedTitle) {
                         const titleText = generatedTitle.replace(/'/g, "''").replace(/:/g, "\\:").replace(/,/g, "\\,");
                         videoChain += `,drawtext=fontfile='${escapedFontPath}':text='${titleText}':fontsize=72:fontcolor=white:x=(w-text_w)/2:y=150:borderw=4:bordercolor=black`;
@@ -655,21 +667,17 @@ async function main() {
 
                         let currentLine = '';
                         let lineStartTime = 0;
-                        let lineEndTime = 0;
                         const maxLineLength = 20;
                         const lines = [];
 
-                        clipDetailedTranscript.forEach((word, index) => {
+                        clipDetailedTranscript.forEach((word, i) => {
                             if (currentLine === '') { lineStartTime = word.startTime; }
                             currentLine += word.word;
-                            lineEndTime = word.endTime;
-
                             const isEndOfSentence = word.word.match(/[。？！.!?]$/);
                             const isLineTooLong = currentLine.length >= maxLineLength;
-                            const isLastWord = index === clipDetailedTranscript.length - 1;
-
+                            const isLastWord = i === clipDetailedTranscript.length - 1;
                             if (isEndOfSentence || isLineTooLong || isLastWord) {
-                                lines.push({ text: currentLine, startTime: lineStartTime, endTime: lineEndTime });
+                                lines.push({ text: currentLine, startTime: lineStartTime, endTime: word.endTime });
                                 currentLine = '';
                             }
                         });
@@ -677,20 +685,11 @@ async function main() {
                         lines.forEach(line => {
                             const text = line.text.replace(/'/g, "''").replace(/:/g, "\\:").replace(/,/g, "\\,");
                             let fontColor = 'white';
-                            let borderColor = 'black';
-                            const excitementThreshold = 10;
-                            const timeIndex = Math.floor(line.startTime);
-                            const excitement = excitementScoreTimeline[timeIndex] || 0;
-
-                            if (excitement > excitementThreshold) { borderColor = 'yellow'; }
-
-                            if (job.settings.highlightKeywords && job.settings.highlightKeywords.length > 0) {
-                                if (job.settings.highlightKeywords.some(k => text.toLowerCase().includes(k.toLowerCase()))) {
-                                    fontColor = 'yellow';
-                                }
+                            const highlightKeywords = job.settings.highlightKeywords ? job.settings.highlightKeywords.split(',').map(k => k.trim().toLowerCase()).filter(k => k) : [];
+                            if (highlightKeywords.length > 0 && highlightKeywords.some(k => text.toLowerCase().includes(k))) {
+                                fontColor = 'yellow';
                             }
-
-                            videoChain += `,drawtext=fontfile='${escapedFontPath}':text='${text}':fontsize=48:fontcolor=${fontColor}:x=(w-text_w)/2:y=h-th-40:enable='between(t,${line.startTime - actualStartTime},${line.endTime - actualStartTime})':borderw=3.5:bordercolor=${borderColor}`;
+                            videoChain += `,drawtext=fontfile='${escapedFontPath}':text='${text}':fontsize=48:fontcolor=${fontColor}:x=(w-text_w)/2:y=h-th-150:enable='between(t,${line.startTime - actualStartTime},${line.endTime - actualStartTime})':box=1:boxcolor=black@0.5:boxborderw=10`;
                         });
                     }
                     complexFilter.push(`${videoChain}[v_out]`);
@@ -703,7 +702,7 @@ async function main() {
 
                     if (job.settings.bgmAtmosphere && fs.existsSync(bgmFilePath)) {
                         clipFfmpeg.input(bgmFilePath);
-                        complexFilter.push('[0:a]volume=1.0[a_main]', '[1:a]volume=0.3[a_bgm]', '[a_main][a_bgm]amerge=inputs=2[a_out]');
+                        complexFilter.push('[0:a]volume=1.0[a_main]', '[1:a]volume=0.15[a_bgm]', '[a_main][a_bgm]amerge=inputs=2[a_out]');
                     } else {
                         complexFilter.push('[0:a]anull[a_out]');
                     }
