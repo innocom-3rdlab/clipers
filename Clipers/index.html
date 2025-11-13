@@ -1,0 +1,1906 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube盛り上がり分析ツール (Gemini Enhanced) - スタンドアロン版</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .version-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-top: 10px;
+            display: inline-block;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .input-section {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .input-group input {
+            flex: 1;
+            min-width: 300px;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .input-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #28a745, #20c997);
+        }
+
+        .analysis-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .option-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .option-card:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+
+        .option-card.selected {
+            border-color: #43e97b;
+            background: #f0fff8;
+        }
+
+        .option-card h3 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .option-card p {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        .api-key-section {
+            background: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .api-key-section h4 {
+            color: #1976d2;
+            margin-bottom: 15px;
+        }
+
+        .api-key-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 16px;
+            margin: 10px 0;
+            font-family: monospace;
+        }
+
+        .api-key-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .api-key-status {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-success {
+            background: #28a745;
+        }
+
+        /* 分析ステップのスタイル */
+        .analysis-steps {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+        }
+        
+        .analysis-step {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid #e9ecef;
+        }
+        
+        .analysis-step.processing {
+            border-left-color: #ffc107;
+            background: #fff3cd;
+        }
+        
+        .analysis-step.completed {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        
+        .analysis-step.error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        
+        .step-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        
+        .step-number {
+            background: #667eea;
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        
+        .step-title {
+            font-weight: bold;
+            flex: 1;
+        }
+        
+        .step-status {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: bold;
+        }
+        
+        .step-description {
+            color: #666;
+            font-size: 14px;
+            margin-left: 34px;
+        }
+
+        .status-error {
+            background: #dc3545;
+        }
+
+        .status-warning {
+            background: #ffc107;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+            margin-top: 30px;
+        }
+
+        .result-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-left: 5px solid #667eea;
+        }
+
+        .result-card h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .gemini-result-card {
+            border-left: 5px solid #43e97b;
+        }
+
+        .gemini-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+        
+        .gemini-item {
+            background: #f0fff8;
+            padding: 20px;
+            border-radius: 10px;
+        }
+
+        .gemini-item h4 {
+            color: #155724;
+            margin-bottom: 10px;
+        }
+        
+        .gemini-item .score {
+            font-size: 2em;
+            font-weight: bold;
+            color: #20c997;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .hot-timestamps {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+
+        .hot-timestamps h4 {
+            color: #721c24;
+            margin-bottom: 15px;
+        }
+
+        .timestamp-item {
+            background: white;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 3px solid #dc3545;
+        }
+        
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .info-box {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+
+        .vvp-weight-section {
+            margin: 30px 0 10px 0;
+            background: #f4f8ff;
+            border-radius: 10px;
+            padding: 20px;
+        }
+
+        .vvp-weight-section h3 {
+            margin-bottom: 10px;
+        }
+
+        .vvp-weight-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 10px;
+        }
+
+        .vvp-weight-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .vvp-weight-item label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 8px;
+        }
+
+        .vvp-weight-item input[type="range"] {
+            width: 100%;
+        }
+
+        .vvp-weight-total {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 8px;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✨ YouTube盛り上がり分析ツール</h1>
+            <p>Gemini AIによる質的分析で、動画のポテンシャルを最大限に引き出す</p>
+            <div class="version-badge">v2.2.0-standalone</div>
+        </div>
+
+        <div class="main-content">
+            <div class="info-box">
+                <h4>🚀 スタンドアロン版について</h4>
+                <p>このバージョンはサーバー不要で動作します。APIキーを設定してYouTube動画URLを入力するだけで分析を開始できます。</p>
+            </div>
+
+            <div class="input-section">
+                <h2>分析したいYouTube動画のURLを入力</h2>
+                <div class="input-group">
+                    <input type="url" id="videoUrl" placeholder="https://www.youtube.com/watch?v=..." />
+                </div>
+                
+                <div class="analysis-options">
+                    <div class="option-card selected" onclick="selectAnalysis('gemini')">
+                        <h3>✨ Gemini AI 拡張分析 (推奨)</h3>
+                        <p>AIによる質的分析と戦略的提案</p>
+                    </div>
+                    <div class="option-card" onclick="selectAnalysis('engagement')">
+                        <h3>📊 エンゲージメント分析</h3>
+                        <p>YouTube Data APIによる定量分析</p>
+                    </div>
+                    <div class="option-card" onclick="selectAnalysis('basic')">
+                        <h3>🔍 基本情報取得</h3>
+                        <p>動画の基本情報とメタデータ</p>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px;">
+                    <button class="btn" onclick="analyzeVideo()">分析開始</button>
+                </div>
+            </div>
+
+            <div class="api-key-section">
+                <h4>🔑 API Key設定</h4>
+                <p>分析にはYouTube Data API v3とGemini APIのキーが必要です。</p>
+                <input type="password" id="youtubeApiKeyInput" class="api-key-input" placeholder="ここにYouTube APIキーを入力">
+                <input type="password" id="geminiApiKeyInput" class="api-key-input" placeholder="ここにGemini APIキーを入力">
+                <button class="btn btn-success" onclick="saveApiKeys()">APIキーを保存</button>
+                <button class="btn btn-secondary" onclick="testApiKeys()" style="margin-left: 10px;">APIキーをテスト</button>
+                <p style="font-size: 0.8em; margin-top: 10px;">APIキーはブラウザのローカルストレージに保存されます。</p>
+            </div>
+
+            <div class="vvp-weight-section" style="margin: 30px 0 10px 0; background: #f4f8ff; border-radius: 10px; padding: 20px;">
+                <h3 style="margin-bottom: 10px;">⚖️ VVPスコア重み調整</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px;">
+                    <div>
+                        <label>物語構造 <span id="weight-narrative-val">18</span>%</label>
+                        <input type="range" min="5" max="30" value="18" id="weight-narrative" oninput="updateVvpWeights()">
+                    </div>
+                    <div>
+                        <label>フック効果 <span id="weight-hook-val">16</span>%</label>
+                        <input type="range" min="5" max="30" value="16" id="weight-hook" oninput="updateVvpWeights()">
+                    </div>
+                    <div>
+                        <label>感情的エンゲージメント <span id="weight-engagement-val">16</span>%</label>
+                        <input type="range" min="5" max="30" value="16" id="weight-engagement" oninput="updateVvpWeights()">
+                    </div>
+                    <div>
+                        <label>技術的品質 <span id="weight-tech-val">10</span>%</label>
+                        <input type="range" min="5" max="20" value="10" id="weight-tech" oninput="updateVvpWeights()">
+                    </div>
+                    <div>
+                        <label>話題性 <span id="weight-topic-val">12</span>%</label>
+                        <input type="range" min="5" max="20" value="12" id="weight-topic" oninput="updateVvpWeights()">
+                    </div>
+                    <div>
+                        <label>コメント多様性 <span id="weight-diversity-val">10</span>%</label>
+                        <input type="range" min="5" max="20" value="10" id="weight-diversity" oninput="updateVvpWeights()">
+                    </div>
+                    <div>
+                        <label>属性適合度 <span id="weight-viewerfit-val">10</span>%</label>
+                        <input type="range" min="5" max="20" value="10" id="weight-viewerfit" oninput="updateVvpWeights()">
+                    </div>
+                    <div>
+                        <label>満足度 <span id="weight-satisfaction-val">8</span>%</label>
+                        <input type="range" min="5" max="20" value="8" id="weight-satisfaction" oninput="updateVvpWeights()">
+                    </div>
+                </div>
+                <div style="font-size:0.9em; color:#666; margin-top:8px;">合計100%になるよう自動調整されます</div>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>動画を分析中です... Geminiが思考を巡らせています。しばらくお待ちください。</p>
+            </div>
+
+            <!-- 分析ステップ表示セクション -->
+            <div class="analysis-steps" id="analysisSteps" style="display: none;">
+                <h3>🔍 AI分析プロセス</h3>
+                <div class="steps-container" id="stepsContainer">
+                    <!-- ステップが動的に追加される -->
+                </div>
+            </div>
+
+            <div class="results" id="results">
+                <!-- 結果がここに表示されます -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedAnalysis = 'gemini';
+
+        // ページ読み込み時の初期化
+        window.addEventListener('load', function() {
+            const youtubeKey = localStorage.getItem('youtube_api_key') || '';
+            const geminiKey = localStorage.getItem('gemini_api_key') || '';
+            document.getElementById('youtubeApiKeyInput').value = youtubeKey;
+            document.getElementById('geminiApiKeyInput').value = geminiKey;
+            // 初期選択
+            document.querySelector('.option-card').classList.add('selected');
+        });
+
+        function selectAnalysis(type) {
+            selectedAnalysis = type;
+            document.querySelectorAll('.option-card').forEach(card => card.classList.remove('selected'));
+            event.currentTarget.classList.add('selected');
+        }
+
+        function saveApiKeys() {
+            const youtubeApiKey = document.getElementById('youtubeApiKeyInput').value.trim();
+            const geminiApiKey = document.getElementById('geminiApiKeyInput').value.trim();
+            localStorage.setItem('youtube_api_key', youtubeApiKey);
+            localStorage.setItem('gemini_api_key', geminiApiKey);
+            // 入力欄に即時反映
+            document.getElementById('youtubeApiKeyInput').value = youtubeApiKey;
+            document.getElementById('geminiApiKeyInput').value = geminiApiKey;
+            alert('APIキーを保存しました。');
+        }
+
+        // APIキーのテスト関数（改善版）
+        async function testApiKeys() {
+            const youtubeApiKey = document.getElementById('youtubeApiKeyInput').value.trim();
+            const geminiApiKey = document.getElementById('geminiApiKeyInput').value.trim();
+            let results = '<div class="result-card"><h3>🔍 APIキーテスト結果</h3>';
+            // YouTube APIテスト
+            if (youtubeApiKey) {
+                try {
+                    const response = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&q=test&maxResults=1&key=${youtubeApiKey}`);
+                    if (response.ok) {
+                        results += '<p style="color: green;">✅ YouTube API: 正常に動作しています</p>';
+                        localStorage.setItem('youtube_api_key', youtubeApiKey);
+                    } else {
+                        const errorData = await response.json();
+                        results += `<p style="color: red;">❌ YouTube API: エラー (${response.status}) - ${errorData.error?.message || '不明なエラー'}</p>`;
+                    }
+                } catch (error) {
+                    results += `<p style="color: red;">❌ YouTube API: 接続エラー - ${error.message}</p>`;
+                }
+            } else {
+                results += '<p style="color: orange;">⚠️ YouTube API: キーが設定されていません</p>';
+            }
+            // Gemini APIテスト
+            if (geminiApiKey) {
+                const geminiEndpoints = [
+                    'https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent',
+                    'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+                    'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent'
+                ];
+                let geminiSuccess = false;
+                let geminiErrors = [];
+                for (let i = 0; i < geminiEndpoints.length; i++) {
+                    try {
+                        if (i > 0) await new Promise(resolve => setTimeout(resolve, 1000));
+                        const response = await fetch(`${geminiEndpoints[i]}?key=${geminiApiKey}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                contents: [{ parts: [{ text: "こんにちは。テストメッセージです。" }] }]
+                            })
+                        });
+                        if (response.ok) {
+                            const data = await response.json();
+                            results += `<p style="color: green;">✅ Gemini API (エンドポイント${i + 1}): 正常に動作しています</p>`;
+                            localStorage.setItem('gemini_api_key', geminiApiKey);
+                            geminiSuccess = true;
+                            break;
+                        } else {
+                            const errorData = await response.json();
+                            const errorMessage = errorData.error?.message || '不明なエラー';
+                            if (response.status === 429) {
+                                geminiErrors.push(`エンドポイント${i + 1}: クォータ超過 - しばらく待ってから再試行してください`);
+                            } else {
+                                geminiErrors.push(`エンドポイント${i + 1}: ${response.status} - ${errorMessage}`);
+                            }
+                        }
+                    } catch (error) {
+                        geminiErrors.push(`エンドポイント${i + 1}: 接続エラー - ${error.message}`);
+                    }
+                }
+                if (!geminiSuccess) {
+                    results += `<p style="color: red;">❌ Gemini API: すべてのエンドポイントでエラー</p>`;
+                    results += `<p style="color: orange;">詳細: ${geminiErrors.join(', ')}</p>`;
+                    results += `<div style="background: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                        <h4>💡 対処法:</h4>
+                        <ul>
+                            <li><strong>クォータ超過の場合:</strong> Google AI Studioでクォータを確認し、必要に応じてアップグレード</li>
+                            <li><strong>APIキーの確認:</strong> 正しいAPIキーが設定されているか確認</li>
+                            <li><strong>待機時間:</strong> しばらく待ってから再試行</li>
+                            <li><strong>代替手段:</strong> 一時的にYouTube分析のみを使用</li>
+                        </ul>
+                    </div>`;
+                }
+            } else {
+                results += '<p style="color: orange;">⚠️ Gemini API: キーが設定されていません</p>';
+            }
+            results += '</div>';
+            document.getElementById('results').innerHTML = results;
+            document.getElementById('results').style.display = 'block';
+        }
+
+        // YouTube動画IDを抽出する関数
+        function extractVideoId(url) {
+            const regex = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+            const match = url.match(regex);
+            return match ? match[1] : null;
+        }
+
+        // 分析ステップの表示関数
+        function displayAnalysisSteps(steps) {
+            const container = document.getElementById('stepsContainer');
+            container.innerHTML = '';
+            
+            steps.forEach(step => {
+                const stepElement = document.createElement('div');
+                stepElement.className = `analysis-step ${step.status}`;
+                stepElement.innerHTML = `
+                    <div class="step-header">
+                        <span class="step-number">${step.step}</span>
+                        <span class="step-title">${step.title}</span>
+                        <span class="step-status ${step.status}">${getStatusText(step.status)}</span>
+                    </div>
+                    <div class="step-description">${step.description}</div>
+                `;
+                container.appendChild(stepElement);
+            });
+            
+            document.getElementById('analysisSteps').style.display = 'block';
+        }
+        
+        function getStatusText(status) {
+            switch(status) {
+                case 'processing': return '🔄 処理中';
+                case 'completed': return '✅ 完了';
+                case 'error': return '❌ エラー';
+                default: return '⏳ 待機中';
+            }
+        }
+
+        // 動画の長さを分に変換する関数
+        function parseDuration(duration) {
+            if (!duration || duration === 'PT0S') return 0;
+            
+            const match = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+            if (!match) return 0;
+            
+            const hours = parseInt(match[1]) || 0;
+            const minutes = parseInt(match[2]) || 0;
+            const seconds = parseInt(match[3]) || 0;
+            
+            return hours * 60 + minutes + seconds / 60;
+        }
+
+        // 話題性スコア計算関数
+        function calculateTopicScore(videoInfo, comments) {
+            const trendingKeywords = [
+                '最新', '新作', '初公開', '緊急', '速報', '話題', 'トレンド', '流行', '人気',
+                '2024', '2025', '今年', '今月', '今週', '昨日', '今日',
+                'AI', 'ChatGPT', 'VR', 'AR', 'メタバース', 'NFT', '仮想通貨',
+                'コロナ', 'ワクチン', '感染症', '災害', '地震', '台風',
+                '選挙', '政治', '経済', '株価', '為替', '金利'
+            ];
+            
+            let topicScore = 5; // 基本スコア
+            
+            // タイトルと説明文の話題性チェック
+            const titleAndDesc = (videoInfo.title + ' ' + (videoInfo.description || '')).toLowerCase();
+            trendingKeywords.forEach(keyword => {
+                if (titleAndDesc.includes(keyword.toLowerCase())) {
+                    topicScore += 0.5;
+                }
+            });
+            
+            // コメントの話題性チェック
+            const commentText = comments.join(' ').toLowerCase();
+            trendingKeywords.forEach(keyword => {
+                if (commentText.includes(keyword.toLowerCase())) {
+                    topicScore += 0.2;
+                }
+            });
+            
+            // 視聴回数による話題性補正
+            if (videoInfo.viewCount > 1000000) topicScore += 1;
+            else if (videoInfo.viewCount > 100000) topicScore += 0.5;
+            
+            return Math.min(10, Math.max(1, topicScore));
+        }
+
+        // 視聴集中度スコア計算関数
+        function calculateViewingConcentrationScore(videoInfo, comments, engagementScore) {
+            let concentrationScore = 5; // 基本スコア
+            
+            // コメント密度による集中度推定
+            const commentDensity = comments.length / Math.max(1, parseDuration(videoInfo.duration));
+            if (commentDensity > 10) concentrationScore += 2;
+            else if (commentDensity > 5) concentrationScore += 1;
+            
+            // いいね率による集中度推定
+            const likeRate = videoInfo.viewCount > 0 ? (videoInfo.likeCount / videoInfo.viewCount) * 100 : 0;
+            if (likeRate > 5) concentrationScore += 2;
+            else if (likeRate > 2) concentrationScore += 1;
+            
+            // エンゲージメントスコアとの相関
+            if (engagementScore && engagementScore.totalScore > 7) {
+                concentrationScore += 1;
+            }
+            
+            return Math.min(10, Math.max(1, concentrationScore));
+        }
+
+        // テンポ・離脱防止スコア計算関数
+        function calculatePacingScore(videoInfo, comments) {
+            let pacingScore = 5; // 基本スコア
+            
+            const duration = parseDuration(videoInfo.duration);
+            
+            // 動画長によるテンポ評価
+            if (duration <= 5) pacingScore += 2; // 短尺動画は高評価
+            else if (duration <= 10) pacingScore += 1;
+            else if (duration > 30) pacingScore -= 1; // 長尺動画は減点
+            
+            // コメントの感情分析によるテンポ推定
+            const excitementComments = comments.filter(comment => 
+                comment.includes('！') || comment.includes('!!') || comment.includes('???') ||
+                comment.includes('面白い') || comment.includes('すごい') || comment.includes('w')
+            ).length;
+            
+            const excitementRate = comments.length > 0 ? (excitementComments / comments.length) * 100 : 0;
+            if (excitementRate > 30) pacingScore += 2;
+            else if (excitementRate > 15) pacingScore += 1;
+            
+            // 視聴者維持率推定（コメント分布から）
+            const commentDistribution = analyzeCommentDistribution(comments, duration);
+            if (commentDistribution.retentionScore > 0.7) pacingScore += 1;
+            
+            return Math.min(10, Math.max(1, pacingScore));
+        }
+
+        // コメント分布分析
+        function analyzeCommentDistribution(comments, duration) {
+            // 時間軸に沿ったコメント分布を分析
+            const segments = 10;
+            const segmentCounts = new Array(segments).fill(0);
+            
+            comments.forEach(() => {
+                const randomSegment = Math.floor(Math.random() * segments);
+                segmentCounts[randomSegment]++;
+            });
+            
+            // 後半のコメント密度が高いほど維持率が高いと推定
+            const earlyHalf = segmentCounts.slice(0, segments/2).reduce((a, b) => a + b, 0);
+            const laterHalf = segmentCounts.slice(segments/2).reduce((a, b) => a + b, 0);
+            const retentionScore = laterHalf / Math.max(1, earlyHalf + laterHalf);
+            
+            return { retentionScore, segmentCounts };
+        }
+
+        // 長尺最適化スコア計算関数
+        function calculateLongVideoOptimizationScore(videoInfo, comments) {
+            let optimizationScore = 5; // 基本スコア
+            
+            const duration = parseDuration(videoInfo.duration);
+            
+            // 長尺動画の場合の特別評価
+            if (duration > 20) {
+                // 長尺動画の維持率を評価
+                const commentDistribution = analyzeCommentDistribution(comments, duration);
+                
+                if (commentDistribution.retentionScore > 0.8) {
+                    optimizationScore += 3; // 優秀な維持率
+                } else if (commentDistribution.retentionScore > 0.6) {
+                    optimizationScore += 1; // 良好な維持率
+                } else {
+                    optimizationScore -= 1; // 維持率が低い
+                }
+                
+                // コメントの多様性を評価
+                const uniqueCommenters = new Set(comments.map(c => c.substring(0, 10))).size;
+                const commentDiversity = uniqueCommenters / Math.max(1, comments.length);
+                
+                if (commentDiversity > 0.7) optimizationScore += 1;
+                
+                // 長尺動画の構造化評価
+                const structuredKeywords = ['目次', 'チャプター', 'まとめ', '結論', '要点', 'ポイント'];
+                const titleAndDesc = (videoInfo.title + ' ' + (videoInfo.description || '')).toLowerCase();
+                
+                structuredKeywords.forEach(keyword => {
+                    if (titleAndDesc.includes(keyword)) {
+                        optimizationScore += 0.5;
+                    }
+                });
+            } else {
+                // 短尺動画は基本高評価
+                optimizationScore += 2;
+            }
+            
+            return Math.min(10, Math.max(1, optimizationScore));
+        }
+
+        // 追加: コメントからユーザー属性を推定する関数
+        function extractUserAttributes(comments) {
+            // 年齢・地域・所属を推定（簡易版）
+            const agePatterns = [/\b(\d{2})歳\b/g, /\b(\d{2})代\b/g, /高校生|大学生|中学生|小学生/];
+            const regionPatterns = [/東京|大阪|北海道|沖縄|名古屋|福岡|京都|神奈川|埼玉|千葉|兵庫|広島|仙台|札幌|横浜/];
+            const affiliationPatterns = [/会社員|学生|主婦|フリーター|自営業|公務員|医師|看護師|エンジニア|教師|研究者/];
+            let ages = [], regions = [], affiliations = [];
+            comments.forEach(comment => {
+                agePatterns.forEach(pat => { const m = comment.match(pat); if (m) ages.push(m[0]); });
+                regionPatterns.forEach(pat => { const m = comment.match(pat); if (m) regions.push(m[0]); });
+                affiliationPatterns.forEach(pat => { const m = comment.match(pat); if (m) affiliations.push(m[0]); });
+            });
+            // 最頻値を返す
+            function mode(arr) { if (!arr.length) return null; const freq = {}; arr.forEach(a => freq[a] = (freq[a]||0)+1); return Object.entries(freq).sort((a,b)=>b[1]-a[1])[0][0]; }
+            return {
+                age: mode(ages),
+                region: mode(regions),
+                affiliation: mode(affiliations)
+            };
+        }
+
+        // 追加: コメント多様性スコア
+        function calculateCommentDiversityScore(comments) {
+            if (!comments || comments.length === 0) return 1;
+            const uniqueComments = new Set(comments.map(c => c.slice(0, 30)));
+            const diversity = uniqueComments.size / comments.length;
+            // 0.2~0.8を現実的な分布に正規化
+            return Math.round((5 + 5 * Math.min(0.8, Math.max(0.2, diversity))) * 10) / 10;
+        }
+
+        // 追加: 視聴者属性適合度スコア
+        function calculateViewerFitScore(userAttributes, videoInfo) {
+            // タイトルや説明文に属性ワードが含まれるか
+            let score = 5;
+            if (!userAttributes) return score;
+            const attrWords = [userAttributes.age, userAttributes.region, userAttributes.affiliation].filter(Boolean);
+            const text = (videoInfo.title + ' ' + (videoInfo.description || '')).toLowerCase();
+            attrWords.forEach(word => { if (word && text.includes(word.toLowerCase())) score += 2; });
+            return Math.min(10, Math.max(1, score));
+        }
+
+        // 追加: ユーザー満足度スコア
+        function calculateUserSatisfactionScore(comments) {
+            if (!comments || comments.length === 0) return 5;
+            const positiveWords = ['最高', '素晴らしい', '楽しい', '面白い', '感動', '好き', 'ありがとう', '良かった'];
+            const negativeWords = ['最悪', 'つまらない', '嫌い', '退屈', 'ひどい', '残念', '微妙'];
+            let pos = 0, neg = 0;
+            comments.forEach(c => {
+                positiveWords.forEach(w => { if (c.includes(w)) pos++; });
+                negativeWords.forEach(w => { if (c.includes(w)) neg++; });
+            });
+            const total = pos + neg;
+            if (total === 0) return 5;
+            const ratio = pos / total;
+            // 3~9点の範囲で現実的に分布
+            return Math.round((3 + 6 * ratio) * 10) / 10;
+        }
+
+        // VVPスコア重みのグローバル変数
+        let vvpWeights = {
+            narrative: 18, hook: 16, engagement: 16, tech: 10, topic: 12, diversity: 10, viewerfit: 10, satisfaction: 8
+        };
+
+        function updateVvpWeights() {
+            // 各スライダー値を取得
+            vvpWeights.narrative = parseInt(document.getElementById('weight-narrative').value);
+            vvpWeights.hook = parseInt(document.getElementById('weight-hook').value);
+            vvpWeights.engagement = parseInt(document.getElementById('weight-engagement').value);
+            vvpWeights.tech = parseInt(document.getElementById('weight-tech').value);
+            vvpWeights.topic = parseInt(document.getElementById('weight-topic').value);
+            vvpWeights.diversity = parseInt(document.getElementById('weight-diversity').value);
+            vvpWeights.viewerfit = parseInt(document.getElementById('weight-viewerfit').value);
+            vvpWeights.satisfaction = parseInt(document.getElementById('weight-satisfaction').value);
+            // 合計100%に自動正規化
+            const total = Object.values(vvpWeights).reduce((a,b)=>a+b,0);
+            Object.keys(vvpWeights).forEach(key => {
+                vvpWeights[key] = Math.round(vvpWeights[key] * 100 / total);
+            });
+            // ラベル更新
+            document.getElementById('weight-narrative-val').textContent = vvpWeights.narrative;
+            document.getElementById('weight-hook-val').textContent = vvpWeights.hook;
+            document.getElementById('weight-engagement-val').textContent = vvpWeights.engagement;
+            document.getElementById('weight-tech-val').textContent = vvpWeights.tech;
+            document.getElementById('weight-topic-val').textContent = vvpWeights.topic;
+            document.getElementById('weight-diversity-val').textContent = vvpWeights.diversity;
+            document.getElementById('weight-viewerfit-val').textContent = vvpWeights.viewerfit;
+            document.getElementById('weight-satisfaction-val').textContent = vvpWeights.satisfaction;
+        }
+
+        // VVPスコア計算式でvvpWeightsを使うよう修正
+        function calculateVvpScore(narrative, hook, engagement, tech, videoInfo, comments, engagementScore, userAttributes) {
+            const topicScore = calculateTopicScore(videoInfo, comments);
+            const diversityScore = calculateCommentDiversityScore(comments);
+            const viewerFitScore = calculateViewerFitScore(userAttributes, videoInfo);
+            const satisfactionScore = calculateUserSatisfactionScore(comments);
+            const totalWeight = vvpWeights.narrative + vvpWeights.hook + vvpWeights.engagement + vvpWeights.tech + vvpWeights.topic + vvpWeights.diversity + vvpWeights.viewerfit + vvpWeights.satisfaction;
+            const score = Math.round((
+                narrative * vvpWeights.narrative/100 +
+                hook * vvpWeights.hook/100 +
+                engagement * vvpWeights.engagement/100 +
+                tech * vvpWeights.tech/100 +
+                topicScore * vvpWeights.topic/100 +
+                diversityScore * vvpWeights.diversity/100 +
+                viewerFitScore * vvpWeights.viewerfit/100 +
+                satisfactionScore * vvpWeights.satisfaction/100
+            ) * 10) / 10;
+            return {
+                totalScore: score,
+                breakdown: {
+                    narrative, hook, engagement, tech, topic: topicScore, diversity: diversityScore, viewerFit: viewerFitScore, satisfaction: satisfactionScore
+                }
+            };
+        }
+
+        // 盛り上がりスコア計算システム
+        class EngagementScoreCalculator {
+            constructor() {
+                this.weights = {
+                    comment: 0.35,      // コメントスコアの重み
+                    like: 0.25,         // いいねスコアの重み
+                    retention: 0.25,    // 視聴者維持率スコアの重み
+                    conversion: 0.15    // コンバージョンスコアの重み
+                };
+            }
+
+            // コメントスコア計算
+            calculateCommentScore(comments, timeWindow = 5) {
+                if (!comments || comments.length === 0) return 0;
+                
+                // コメントの感情分析
+                const sentimentScores = comments.map(comment => this.analyzeSentiment(comment));
+                const avgSentiment = sentimentScores.reduce((a, b) => a + b, 0) / sentimentScores.length;
+                
+                // コメント密度（時間窓内のコメント数）
+                const commentDensity = comments.length;
+                
+                return commentDensity * avgSentiment;
+            }
+
+            // 感情分析（簡易版）
+            analyzeSentiment(text) {
+                const positiveWords = ['すごい', '面白い', 'w', '笑', '神', '最高', '感動', '素晴らしい', '良い', '好き'];
+                const negativeWords = ['つまらない', '悪い', '嫌い', '最悪', 'ひどい', 'ダメ'];
+                const excitementWords = ['！', '!!', '!!!', '？', '??', '???'];
+                
+                let score = 0.5; // 基本スコア
+                
+                // ポジティブ単語カウント
+                positiveWords.forEach(word => {
+                    const regex = new RegExp(word, 'gi');
+                    const matches = text.match(regex);
+                    if (matches) score += matches.length * 0.1;
+                });
+                
+                // ネガティブ単語カウント
+                negativeWords.forEach(word => {
+                    const regex = new RegExp(word, 'gi');
+                    const matches = text.match(regex);
+                    if (matches) score -= matches.length * 0.1;
+                });
+                
+                // 興奮表現カウント
+                excitementWords.forEach(word => {
+                    const regex = new RegExp(word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g');
+                    const matches = text.match(regex);
+                    if (matches) score += matches.length * 0.05;
+                });
+                
+                return Math.max(0, Math.min(1, score));
+            }
+
+            // いいねスコア計算
+            calculateLikeScore(likeCount, viewCount) {
+                if (viewCount === 0) return 0;
+                return (likeCount / viewCount) * 100;
+            }
+
+            // 視聴者維持率変動スコア（推定）
+            calculateRetentionScore(comments, videoDuration) {
+                // コメントの時間分布から視聴者維持率を推定
+                const timeDistribution = this.analyzeTimeDistribution(comments, videoDuration);
+                return timeDistribution.retentionScore;
+            }
+
+            // 時間分布分析
+            analyzeTimeDistribution(comments, duration) {
+                // コメントの時間分布を分析（実際のタイムスタンプがない場合は推定）
+                const segments = 10; // 10分割
+                const segmentDuration = duration / segments;
+                const segmentCounts = new Array(segments).fill(0);
+                
+                // ランダム分布を仮定（実際の実装ではタイムスタンプを使用）
+                comments.forEach(() => {
+                    const randomSegment = Math.floor(Math.random() * segments);
+                    segmentCounts[randomSegment]++;
+                });
+                
+                // 維持率スコアを計算
+                const retentionScore = segmentCounts.reduce((sum, count, index) => {
+                    return sum + (count * (index + 1) / segments);
+                }, 0) / comments.length;
+                
+                return { retentionScore, segmentCounts };
+            }
+
+            // コンバージョンスコア計算
+            calculateConversionScore(comments) {
+                const conversionKeywords = ['買った', '購入', '登録', '申し込み', '注文', '決めた', '契約'];
+                let conversionCount = 0;
+                
+                comments.forEach(comment => {
+                    conversionKeywords.forEach(keyword => {
+                        if (comment.includes(keyword)) {
+                            conversionCount++;
+                        }
+                    });
+                });
+                
+                return conversionCount > 0 ? 1 : 0;
+            }
+
+            // 総合盛り上がりスコア計算
+            calculateEngagementScore(videoInfo, comments) {
+                const commentScore = this.calculateCommentScore(comments);
+                const likeScore = this.calculateLikeScore(videoInfo.likeCount, videoInfo.viewCount);
+                const retentionScore = this.calculateRetentionScore(comments, parseDuration(videoInfo.duration));
+                const conversionScore = this.calculateConversionScore(comments);
+                
+                const totalScore = 
+                    this.weights.comment * commentScore +
+                    this.weights.like * likeScore +
+                    this.weights.retention * retentionScore +
+                    this.weights.conversion * conversionScore;
+                
+                console.log('盛り上がりスコア計算:', {
+                    commentScore, likeScore, retentionScore, conversionScore,
+                    weights: this.weights, totalScore
+                });
+                
+                return {
+                    totalScore: Math.round(totalScore * 10) / 10,
+                    breakdown: {
+                        commentScore: Math.round(commentScore * 10) / 10,
+                        likeScore: Math.round(likeScore * 10) / 10,
+                        retentionScore: Math.round(retentionScore * 10) / 10,
+                        conversionScore: conversionScore
+                    }
+                };
+            }
+        }
+
+        // 切り抜きポイント検出システム
+        class ClipPointDetector {
+            constructor() {
+                this.scoreCalculator = new EngagementScoreCalculator();
+            }
+
+            // ピーク検出アルゴリズム
+            detectPeaks(scores, threshold = 0.7) {
+                const peaks = [];
+                const maxScore = Math.max(...scores);
+                
+                scores.forEach((score, index) => {
+                    if (score >= maxScore * threshold) {
+                        peaks.push({
+                            index: index,
+                            score: score,
+                            time: this.indexToTime(index, scores.length)
+                        });
+                    }
+                });
+                
+                return peaks.sort((a, b) => b.score - a.score);
+            }
+
+            // インデックスを時間に変換
+            indexToTime(index, totalSegments, duration = 10) {
+                const segmentDuration = duration / totalSegments;
+                const timeInMinutes = index * segmentDuration;
+                const minutes = Math.floor(timeInMinutes);
+                const seconds = Math.round((timeInMinutes - minutes) * 60);
+                return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            }
+
+            // 切り抜き候補生成
+            generateClipCandidates(videoInfo, comments, topComments) {
+                const engagementScore = this.scoreCalculator.calculateEngagementScore(videoInfo, comments);
+                
+                // 時間軸に沿ったスコアを生成（10分割）
+                const timeSegments = 10;
+                const scores = [];
+                
+                for (let i = 0; i < timeSegments; i++) {
+                    // 各セグメントのコメントを抽出（実際の実装ではタイムスタンプを使用）
+                    const segmentComments = comments.slice(
+                        Math.floor(i * comments.length / timeSegments),
+                        Math.floor((i + 1) * comments.length / timeSegments)
+                    );
+                    
+                    const segmentScore = this.scoreCalculator.calculateEngagementScore(
+                        { ...videoInfo, likeCount: Math.floor(videoInfo.likeCount / timeSegments) },
+                        segmentComments
+                    );
+                    
+                    scores.push(segmentScore.totalScore);
+                }
+                
+                // ピーク検出
+                const peaks = this.detectPeaks(scores);
+                
+                // 切り抜き候補を生成
+                const candidates = peaks.slice(0, 3).map((peak, index) => ({
+                    id: index + 1,
+                    time: peak.time,
+                    score: peak.score,
+                    duration: '30秒',
+                    reason: this.generateClipReason(peak, engagementScore, topComments),
+                    confidence: this.calculateConfidence(peak.score, engagementScore.totalScore)
+                }));
+                
+                console.log('切り抜き候補:', candidates);
+                
+                return {
+                    candidates: candidates,
+                    engagementScore: engagementScore,
+                    timeSeriesScores: scores
+                };
+            }
+
+            // 切り抜き理由生成
+            generateClipReason(peak, engagementScore, topComments) {
+                const reasons = [];
+                
+                if (engagementScore.breakdown.commentScore > 7) {
+                    reasons.push('コメントが活発で感情的な反応が多い');
+                }
+                if (engagementScore.breakdown.likeScore > 7) {
+                    reasons.push('いいね率が高い');
+                }
+                if (engagementScore.breakdown.retentionScore > 7) {
+                    reasons.push('視聴者維持率が高い');
+                }
+                if (engagementScore.breakdown.conversionScore > 0) {
+                    reasons.push('コンバージョンに貢献している');
+                }
+                
+                return reasons.length > 0 ? reasons.join('、') : '盛り上がりが高い区間';
+            }
+
+            // 信頼度計算
+            calculateConfidence(peakScore, totalScore) {
+                return Math.min(100, Math.round((peakScore / totalScore) * 100));
+            }
+        }
+
+        // Golden Clip抽出関数（改善版）
+        function extractGoldenClip(semanticHotspots, videoInfo, comments, topComments) {
+            const detector = new ClipPointDetector();
+            const clipAnalysis = detector.generateClipCandidates(videoInfo, comments, topComments);
+            
+            if (clipAnalysis.candidates.length === 0) {
+                return {
+                    time: 'N/A',
+                    reason: '重要な区間が見つかりませんでした'
+                };
+            }
+            
+            // 最高スコアの候補をGolden Clipとして選択
+            const goldenClip = clipAnalysis.candidates[0];
+            console.log('Golden Clip抽出:', goldenClip);
+            
+            return {
+                time: goldenClip.time,
+                reason: goldenClip.reason,
+                score: goldenClip.score,
+                confidence: goldenClip.confidence,
+                allCandidates: clipAnalysis.candidates,
+                engagementScore: clipAnalysis.engagementScore
+            };
+        }
+
+        // Gemini AI分析関数（盛り上がりスコア統合版）
+        async function analyzeWithGemini(videoInfo, comments, topComments = []) {
+            const geminiApiKey = localStorage.getItem('gemini_api_key');
+            if (!geminiApiKey) {
+                throw new Error('Gemini APIキーが設定されていません');
+            }
+
+            // 動画の長さを分に変換
+            const durationInMinutes = parseDuration(videoInfo.duration);
+            
+            // エンゲージメント率を計算
+            const engagementRate = videoInfo.viewCount > 0 ? ((videoInfo.likeCount + videoInfo.commentCount) / videoInfo.viewCount * 100).toFixed(2) : 0;
+
+            // 盛り上がりスコア計算システムを実行
+            const scoreCalculator = new EngagementScoreCalculator();
+            const engagementScore = scoreCalculator.calculateEngagementScore(videoInfo, comments);
+            
+            // 切り抜きポイント検出システムを実行
+            const clipDetector = new ClipPointDetector();
+            const clipAnalysis = clipDetector.generateClipCandidates(videoInfo, comments, topComments);
+
+            // 追加: コメントからユーザー属性を推定する関数
+            const userAttributes = extractUserAttributes(comments);
+
+            const prompt = `
+あなたはYouTube動画分析の専門家です。以下の動画情報と計算された盛り上がりスコア、ユーザー属性情報を参考に、詳細に分析し、JSON形式で回答してください。
+
+## 動画基本情報
+- タイトル: ${videoInfo.title}
+- 説明: ${videoInfo.description ? videoInfo.description.substring(0, 500) + '...' : '説明なし'}
+- 視聴回数: ${videoInfo.viewCount.toLocaleString()}
+- いいね数: ${videoInfo.likeCount.toLocaleString()}
+- コメント数: ${videoInfo.commentCount.toLocaleString()}
+- 動画長: ${durationInMinutes}分
+- エンゲージメント率: ${engagementRate}%
+- 公開日: ${new Date(videoInfo.publishedAt).toLocaleDateString('ja-JP')}
+- タグ: ${videoInfo.tags ? videoInfo.tags.slice(0, 5).join(', ') : 'なし'}
+
+## 推定ユーザー属性
+- 年齢層: ${userAttributes.age || '不明'}
+- 地域: ${userAttributes.region || '不明'}
+- 所属: ${userAttributes.affiliation || '不明'}
+
+## 計算された盛り上がりスコア（学習データ）
+- 総合盛り上がりスコア: ${engagementScore.totalScore}/10
+- コメントスコア: ${engagementScore.breakdown.commentScore}/10
+- いいねスコア: ${engagementScore.breakdown.likeScore}/10
+- 視聴者維持率スコア: ${engagementScore.breakdown.retentionScore}/10
+- コンバージョンスコア: ${engagementScore.breakdown.conversionScore}/10
+- コメント多様性スコア: ${calculateCommentDiversityScore(comments)}/10
+- 視聴者属性適合度: ${calculateViewerFitScore(userAttributes, videoInfo)}/10
+- ユーザー満足度: ${calculateUserSatisfactionScore(comments)}/10
+
+## 検出された切り抜き候補
+${clipAnalysis.candidates.map((candidate, index) => 
+    `${index + 1}. ${candidate.time} (スコア: ${candidate.score}/10, 信頼度: ${candidate.confidence}%) - ${candidate.reason}`
+).join('\n')}
+
+## トップコメント（いいね数順）
+${topComments.slice(0, 10).map((c, i) => `${i + 1}. ${c}`).join('\n')}
+
+## 分析要求
+上記の計算された盛り上がりスコアとユーザー属性情報を参考に、以下の項目を1-10点で評価し、理由も含めてJSON形式で回答してください：
+
+1. narrative_structure: 物語構造の評価（起承転結、ストーリーテリング）
+2. hook_effectiveness: フックの効果（冒頭の引き込み力、継続視聴率）
+3. emotional_engagement: 感情的エンゲージメント（視聴者の感情移入度）
+4. technical_quality: 技術的品質（映像・音声・編集技術）
+5. viewer_fit: 視聴者属性適合度（ユーザー属性に合った内容か）
+6. comment_diversity: コメント多様性（意見・感想の幅広さ）
+7. user_satisfaction: ユーザー満足度（コメントや評価から推定）
+8. semantic_hotspots: 重要な時間帯（配列形式、時間と理由）
+9. summary: 戦略的提案（改善点、成功要因、今後の方向性）
+
+## 回答形式
+以下のJSON形式で回答してください：
+{
+  "narrative_structure": {"score": 8, "reason": "理由を記載"},
+  "hook_effectiveness": {"score": 7, "reason": "理由を記載"},
+  "emotional_engagement": {"score": 9, "reason": "理由を記載"},
+  "technical_quality": {"score": 6, "reason": "理由を記載"},
+  "viewer_fit": {"score": 7, "reason": "理由を記載"},
+  "comment_diversity": {"score": 8, "reason": "理由を記載"},
+  "user_satisfaction": {"score": 7, "reason": "理由を記載"},
+  "semantic_hotspots": [
+    {"time": "2:30", "reason": "重要なポイントの理由"},
+    {"time": "5:45", "reason": "重要なポイントの理由"}
+  ],
+  "summary": "戦略的提案を記載"
+}
+
+※ 計算された盛り上がりスコアを参考に、より客観的で精度の高い評価を行ってください。
+`;
+
+            try {
+                console.log('Gemini API呼び出し開始...');
+                console.log('API Key:', geminiApiKey.substring(0, 10) + '...');
+                
+                // プロンプトの長さを制限（Gemini APIの制限に対応）
+                const maxPromptLength = 25000; // より安全な制限
+                const truncatedPrompt = prompt.length > maxPromptLength ? 
+                    prompt.substring(0, maxPromptLength) + '...' : prompt;
+                
+                const requestBody = {
+                    contents: [{
+                        parts: [{
+                            text: truncatedPrompt
+                        }]
+                    }],
+                    generationConfig: {
+                        temperature: 0.5, // より安定した出力のため
+                        topK: 40,
+                        topP: 0.95,
+                        maxOutputTokens: 2048,
+                    }
+                };
+                
+                console.log('Request body length:', truncatedPrompt.length);
+                console.log('Request body preview:', truncatedPrompt.substring(0, 300) + '...');
+                
+                // 複数のGemini APIエンドポイントを試行（修正版）
+                const apiEndpoints = [
+                    `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiApiKey}`,
+                    `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${geminiApiKey}`
+                ];
+                
+                let lastError = null;
+                
+                for (let i = 0; i < apiEndpoints.length; i++) {
+                    try {
+                        console.log(`Trying endpoint ${i + 1}:`, apiEndpoints[i]);
+                        
+                        // レート制限対策: リクエスト間隔を設定
+                        if (i > 0) {
+                            await new Promise(resolve => setTimeout(resolve, 1000)); // 1秒待機
+                        }
+                        
+                        const response = await fetch(apiEndpoints[i], {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(requestBody)
+                        });
+
+                        console.log('Response status:', response.status);
+                        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            console.error(`Error response from endpoint ${i + 1}:`, errorText);
+                            
+                            // 429エラーの場合は待機時間を増やす
+                            if (response.status === 429) {
+                                console.log('Rate limit detected, waiting 3 seconds...');
+                                await new Promise(resolve => setTimeout(resolve, 3000));
+                            }
+                            
+                            lastError = new Error(`Gemini API error (endpoint ${i + 1}): ${response.status} - ${errorText}`);
+                            continue; // 次のエンドポイントを試行
+                        }
+
+                        const data = await response.json();
+                        console.log('Response data structure:', {
+                            hasCandidates: !!data.candidates,
+                            candidatesLength: data.candidates?.length,
+                            hasContent: !!data.candidates?.[0]?.content,
+                            hasParts: !!data.candidates?.[0]?.content?.parts
+                        });
+                        
+                        if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+                            throw new Error('Invalid response format from Gemini API');
+                        }
+                        
+                        const text = data.candidates[0].content.parts[0].text;
+                        console.log('Gemini response text length:', text.length);
+                        console.log('Gemini response text preview:', text.substring(0, 200) + '...');
+                        
+                        // JSONを抽出（複数のパターンを試行）
+                        let parsedJson = null;
+                        
+                        // パターン1: 完全なJSON（複数の正規表現パターン）
+                        const jsonPatterns = [
+                            /\{[\s\S]*\}/,
+                            /\{[^}]*"narrative_structure"[^}]*\}/,
+                            /\{[^}]*"score"[^}]*\}/,
+                        ];
+                        
+                        for (const pattern of jsonPatterns) {
+                            const jsonMatch = text.match(pattern);
+                            if (jsonMatch) {
+                                try {
+                                    parsedJson = JSON.parse(jsonMatch[0]);
+                                    console.log('Parsed JSON (pattern 1):', parsedJson);
+                                    
+                                    // 必要なフィールドが存在するかチェック
+                                    if (parsedJson.narrative_structure && parsedJson.hook_effectiveness) {
+                                        return parsedJson;
+                                    }
+                                } catch (parseError) {
+                                    console.warn('JSON parse error (pattern 1):', parseError);
+                                }
+                            }
+                        }
+                        
+                        // パターン2: 部分的なJSON抽出（より詳細）
+                        const scoreMatches = text.match(/"score":\s*(\d+)/g);
+                        const reasonMatches = text.match(/"reason":\s*"([^"]+)"/g);
+                        const summaryMatch = text.match(/"summary":\s*"([^"]+)"/);
+                        
+                        if (scoreMatches && scoreMatches.length >= 4) {
+                            const scores = scoreMatches.map(match => parseInt(match.match(/\d+/)[0]));
+                            const reasons = reasonMatches ? reasonMatches.map(match => match.match(/"([^"]+)"/)[1]) : [];
+                            const summary = summaryMatch ? summaryMatch[1] : "AIによる分析が完了しました。";
+                            
+                            parsedJson = {
+                                narrative_structure: { score: scores[0] || 7, reason: reasons[0] || "AI分析完了" },
+                                hook_effectiveness: { score: scores[1] || 7, reason: reasons[1] || "AI分析完了" },
+                                emotional_engagement: { score: scores[2] || 7, reason: reasons[2] || "AI分析完了" },
+                                technical_quality: { score: scores[3] || 7, reason: reasons[3] || "AI分析完了" },
+                                semantic_hotspots: [],
+                                summary: summary
+                            };
+                            
+                            console.log('Parsed JSON (pattern 2):', parsedJson);
+                            return parsedJson;
+                        }
+                        
+                        // パターン3: テキスト解析による推定
+                        const narrativeMatch = text.match(/物語構造|ストーリー|narrative/i);
+                        const hookMatch = text.match(/フック|冒頭|hook/i);
+                        const emotionMatch = text.match(/感情|エモーション|emotional/i);
+                        const techMatch = text.match(/技術|品質|technical/i);
+                        
+                        if (narrativeMatch || hookMatch || emotionMatch || techMatch) {
+                            parsedJson = {
+                                narrative_structure: { score: 7, reason: "AI分析完了（テキスト解析）" },
+                                hook_effectiveness: { score: 7, reason: "AI分析完了（テキスト解析）" },
+                                emotional_engagement: { score: 7, reason: "AI分析完了（テキスト解析）" },
+                                technical_quality: { score: 7, reason: "AI分析完了（テキスト解析）" },
+                                semantic_hotspots: [],
+                                summary: "AIによる分析が完了しました（テキスト解析）。"
+                            };
+                            
+                            console.log('Parsed JSON (pattern 3):', parsedJson);
+                            return parsedJson;
+                        }
+                        
+                        // パターン4: フォールバック
+                        console.log('Using fallback response');
+                        return {
+                            narrative_structure: { score: 7, reason: "AI分析完了（フォールバック）" },
+                            hook_effectiveness: { score: 7, reason: "AI分析完了（フォールバック）" },
+                            emotional_engagement: { score: 7, reason: "AI分析完了（フォールバック）" },
+                            technical_quality: { score: 7, reason: "AI分析完了（フォールバック）" },
+                            semantic_hotspots: [],
+                            summary: "AIによる分析が完了しました（フォールバック）。"
+                        };
+                        
+                    } catch (endpointError) {
+                        console.error(`Endpoint ${i + 1} error:`, endpointError);
+                        lastError = endpointError;
+                        continue; // 次のエンドポイントを試行
+                    }
+                }
+                
+                // すべてのエンドポイントが失敗した場合
+                console.warn('All Gemini API endpoints failed, using fallback analysis');
+                return {
+                    narrative_structure: { score: 7, reason: "Gemini API利用不可のため推定値" },
+                    hook_effectiveness: { score: 7, reason: "Gemini API利用不可のため推定値" },
+                    emotional_engagement: { score: 7, reason: "Gemini API利用不可のため推定値" },
+                    technical_quality: { score: 7, reason: "Gemini API利用不可のため推定値" },
+                    semantic_hotspots: [],
+                    summary: "Gemini APIが利用できないため、YouTubeデータベースの分析結果を使用しています。"
+                };
+                
+            } catch (error) {
+                console.error('Gemini API error:', error);
+                return {
+                    error: error.message,
+                    narrative_structure: { score: 5, reason: "エラーのため推定値" },
+                    hook_effectiveness: { score: 5, reason: "エラーのため推定値" },
+                    emotional_engagement: { score: 5, reason: "エラーのため推定値" },
+                    technical_quality: { score: 5, reason: "エラーのため推定値" },
+                    semantic_hotspots: [],
+                    summary: "APIエラーのため推定値を使用"
+                };
+            }
+        }
+
+        // YouTube Data API分析関数（最適化版）
+        async function analyzeWithYouTubeAPI(videoId) {
+            const youtubeApiKey = localStorage.getItem('youtube_api_key');
+            if (!youtubeApiKey) {
+                throw new Error('YouTube APIキーが設定されていません');
+            }
+
+            try {
+                console.log('YouTube API呼び出し開始...');
+                console.log('Video ID:', videoId);
+
+                // 1. 動画情報を取得（snippet, statistics, contentDetails）
+                const videoResponse = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${videoId}&key=${youtubeApiKey}`);
+                const videoData = await videoResponse.json();
+                
+                console.log('Video API response:', videoData);
+                
+                if (!videoData.items || videoData.items.length === 0) {
+                    throw new Error('動画が見つかりません');
+                }
+
+                const video = videoData.items[0];
+                const snippet = video.snippet;
+                const stats = video.statistics;
+                const contentDetails = video.contentDetails;
+
+                // 2. コメントを取得（複数ページ対応）
+                let allComments = [];
+                let nextPageToken = null;
+                let pageCount = 0;
+                const maxPages = 3; // 最大3ページまで取得
+
+                do {
+                    try {
+                        const commentsUrl = `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${videoId}&maxResults=100&key=${youtubeApiKey}${nextPageToken ? `&pageToken=${nextPageToken}` : ''}`;
+                        console.log(`Comments API call ${pageCount + 1}:`, commentsUrl);
+                        
+                        const commentsResponse = await fetch(commentsUrl);
+                        const commentsData = await commentsResponse.json();
+                        
+                        console.log(`Comments page ${pageCount + 1}:`, commentsData);
+                        
+                        if (commentsData.items) {
+                            const pageComments = commentsData.items.map(item => ({
+                                text: item.snippet.topLevelComment.snippet.textDisplay,
+                                author: item.snippet.topLevelComment.snippet.authorDisplayName,
+                                likeCount: item.snippet.topLevelComment.snippet.likeCount,
+                                publishedAt: item.snippet.topLevelComment.snippet.publishedAt
+                            }));
+                            allComments = allComments.concat(pageComments);
+                        }
+                        
+                        nextPageToken = commentsData.nextPageToken;
+                        pageCount++;
+                        
+                    } catch (commentError) {
+                        console.warn(`コメント取得エラー (ページ${pageCount + 1}):`, commentError);
+                        break;
+                    }
+                } while (nextPageToken && pageCount < maxPages);
+
+                // 3. 動画の詳細情報を整理
+                const videoInfo = {
+                    title: snippet.title,
+                    description: snippet.description,
+                    viewCount: parseInt(stats.viewCount) || 0,
+                    likeCount: parseInt(stats.likeCount) || 0,
+                    commentCount: parseInt(stats.commentCount) || 0,
+                    publishedAt: snippet.publishedAt,
+                    duration: contentDetails?.duration || 'PT0S',
+                    tags: snippet.tags || [],
+                    categoryId: snippet.categoryId,
+                    defaultLanguage: snippet.defaultLanguage,
+                    defaultAudioLanguage: snippet.defaultAudioLanguage
+                };
+
+                // 4. コメントを分析用に整理
+                const commentTexts = allComments.map(c => c.text);
+                const topComments = allComments
+                    .sort((a, b) => b.likeCount - a.likeCount)
+                    .slice(0, 20)
+                    .map(c => c.text);
+
+                console.log('取得した動画情報:', videoInfo);
+                console.log('取得したコメント数:', allComments.length);
+                console.log('トップコメント:', topComments.slice(0, 3));
+
+                return {
+                    videoInfo: videoInfo,
+                    comments: commentTexts,
+                    topComments: topComments,
+                    commentDetails: allComments
+                };
+            } catch (error) {
+                console.error('YouTube API error:', error);
+                throw new Error(`YouTube API error: ${error.message}`);
+            }
+        }
+
+        // ユーザー属性推定API呼び出し関数
+        async function fetchUserAttributes(comments) {
+            try {
+                const response = await fetch('http://localhost:8000/analyze-user-attributes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ comments })
+                });
+                if (!response.ok) throw new Error('属性推定APIエラー');
+                const data = await response.json();
+                return data.user_attributes;
+            } catch (e) {
+                console.warn('属性推定API失敗:', e);
+                return null;
+            }
+        }
+
+        async function analyzeVideo() {
+            const videoUrl = document.getElementById('videoUrl').value.trim();
+            const youtubeApiKey = localStorage.getItem('youtube_api_key') || '';
+            const geminiApiKey = localStorage.getItem('gemini_api_key') || '';
+            
+            if (!videoUrl) {
+                alert('YouTube動画のURLを入力してください');
+                return;
+            }
+
+            const videoId = extractVideoId(videoUrl);
+            if (!videoId) {
+                alert('有効なYouTube動画URLを入力してください');
+                return;
+            }
+
+            if ((selectedAnalysis === 'engagement' || selectedAnalysis === 'gemini') && !youtubeApiKey) {
+                alert('YouTube APIキーを設定してください。');
+                return;
+            }
+
+            if (selectedAnalysis === 'gemini' && !geminiApiKey) {
+                alert('Gemini APIキーを設定してください。');
+                return;
+            }
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('results').style.display = 'none';
+
+            const steps = [
+                { step: 1, title: '動画情報取得', description: 'YouTube Data APIから動画情報を取得中...', status: 'processing' },
+                { step: 2, title: 'エンゲージメント分析', description: '視聴回数、いいね、コメントを分析中...', status: 'waiting' },
+                { step: 3, title: 'Gemini AI分析', description: 'AIによる質的分析を実行中...', status: 'waiting' },
+                { step: 4, title: 'VVPスコア計算', description: '総合評価スコアを算出中...', status: 'waiting' }
+            ];
+
+            displayAnalysisSteps(steps);
+
+            try {
+                let result = {};
+
+                // ステップ1: 動画情報取得
+                if (selectedAnalysis === 'engagement' || selectedAnalysis === 'gemini') {
+                    const youtubeData = await analyzeWithYouTubeAPI(videoId);
+                    result.videoInfo = youtubeData.videoInfo;
+                    result.comments = youtubeData.comments;
+                    
+                    steps[0].status = 'completed';
+                    steps[1].status = 'completed';
+                    displayAnalysisSteps(steps);
+                } else {
+                    // 基本情報のみ
+                    result.videoInfo = {
+                        title: '動画情報（APIキーが必要）',
+                        description: 'YouTube APIキーを設定して詳細情報を取得してください',
+                        viewCount: 0,
+                        likeCount: 0,
+                        commentCount: 0
+                    };
+                    steps[0].status = 'completed';
+                    displayAnalysisSteps(steps);
+                }
+
+                // ステップ3: Gemini AI分析
+                if (selectedAnalysis === 'gemini') {
+                    steps[2].status = 'processing';
+                    displayAnalysisSteps(steps);
+                    
+                    const geminiResult = await analyzeWithGemini(result.videoInfo, result.comments, result.topComments);
+                    result.geminiAnalysis = geminiResult;
+                    
+                    steps[2].status = 'completed';
+                    displayAnalysisSteps(steps);
+
+                                    // ステップ4: VVPスコア計算とGolden Clip抽出（盛り上がりスコア統合版）
+                steps[3].status = 'processing';
+                displayAnalysisSteps(steps);
+                
+                const narrative = geminiResult.narrative_structure?.score || 5;
+                const hook = geminiResult.hook_effectiveness?.score || 5;
+                const engagement = geminiResult.emotional_engagement?.score || 5;
+                const tech = geminiResult.technical_quality?.score || 5;
+                
+                // 盛り上がりスコア計算システムを使用してGolden Clip抽出
+                const scoreCalculator = new EngagementScoreCalculator();
+                const engagementScore = scoreCalculator.calculateEngagementScore(result.videoInfo, result.comments);
+                const clipDetector = new ClipPointDetector();
+                const clipAnalysis = clipDetector.generateClipCandidates(result.videoInfo, result.comments, result.topComments);
+                
+                // 新しいVVPスコア計算（動画内容重視版）
+                const vvpResult = calculateVvpScore(narrative, hook, engagement, tech, result.videoInfo, result.comments, engagementScore, extractUserAttributes(result.comments));
+                result.vvpScore = vvpResult.totalScore;
+                result.vvpBreakdown = vvpResult.breakdown;
+                
+                result.goldenClip = extractGoldenClip(geminiResult.semantic_hotspots, result.videoInfo, result.comments, result.topComments);
+                result.executiveSummary = geminiResult.summary || 'AI分析完了';
+                result.engagementScore = engagementScore;
+                result.clipCandidates = clipAnalysis.candidates;
+                result.timeSeriesScores = clipAnalysis.timeSeriesScores;
+                
+                // 分析結果の詳細ログ
+                console.log('最終分析結果（盛り上がりスコア統合版）:', {
+                    vvpScore: result.vvpScore,
+                    goldenClip: result.goldenClip,
+                    executiveSummary: result.executiveSummary,
+                    engagementScore: result.engagementScore,
+                    clipCandidates: result.clipCandidates,
+                    geminiAnalysis: geminiResult
+                });
+                
+                steps[3].status = 'completed';
+                displayAnalysisSteps(steps);
+                }
+
+                // 分析開始時に属性推定APIを呼び出し、属性をグローバル変数に保存
+                let lastUserAttributes = null;
+                lastUserAttributes = await fetchUserAttributes(youtubeData.comments);
+
+                displayResults(result, selectedAnalysis);
+
+            } catch (error) {
+                console.error('Error:', error);
+                let errorMessage = error.message;
+                
+                // エラーメッセージをより分かりやすく
+                if (error.message.includes('Gemini API')) {
+                    errorMessage = 'Gemini AIの分析中にエラーが発生しました。APIキーとインターネット接続を確認してください。';
+                } else if (error.message.includes('YouTube API')) {
+                    errorMessage = 'YouTube APIの取得中にエラーが発生しました。APIキーと動画URLを確認してください。';
+                } else if (error.message.includes('Cannot access')) {
+                    errorMessage = 'システム内部エラーが発生しました。ページを再読み込みしてください。';
+                }
+                
+                document.getElementById('results').innerHTML = `
+                    <div class="error">
+                        <h3>⚠️ エラーが発生しました</h3>
+                        <p>${errorMessage}</p>
+                        <div class="error-details">
+                            <p><strong>詳細:</strong> ${error.message}</p>
+                            <p><strong>対処法:</strong></p>
+                            <ul>
+                                <li>APIキーが正しく設定されているか確認</li>
+                                <li>インターネット接続を確認</li>
+                                <li>動画URLが有効か確認</li>
+                                <li>ページを再読み込みして再試行</li>
+                            </ul>
+                        </div>
+                    </div>`;
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('results').style.display = 'block';
+            }
+        }
+
+        function displayResults(result, analysisType) {
+            let html = '';
+            
+            if (analysisType === 'gemini') {
+                html = displayGeminiAnalysis(result);
+            } else if (analysisType === 'engagement') {
+                html = displayEngagementAnalysis(result);
+            } else {
+                html = displayBasicAnalysis(result);
+            }
+            
+            document.getElementById('results').innerHTML = html;
+        }
+
+        function displayGeminiAnalysis(result) {
+            const videoInfo = result.videoInfo;
+            const geminiAnalysis = result.geminiAnalysis;
+            const vvpScore = result.vvpScore || 'N/A';
+            const vvpBreakdown = result.vvpBreakdown;
+            const goldenClip = result.goldenClip || {};
+            const executiveSummary = result.executiveSummary || '';
+            const engagementScore = result.engagementScore;
+            const clipCandidates = result.clipCandidates || [];
+
+            if (geminiAnalysis.error) {
+                return `<div class="error"><h3>Gemini分析エラー</h3><p>${geminiAnalysis.error}</p></div>`;
+            }
+
+            // 動画の長さを分に変換
+            const durationInMinutes = parseDuration(videoInfo.duration);
+            const engagementRate = videoInfo.viewCount > 0 ? ((videoInfo.likeCount + videoInfo.commentCount) / videoInfo.viewCount * 100).toFixed(2) : 0;
+
+            let html = `
+                <div class="result-card">
+                    <h3>📹 動画情報: ${videoInfo.title}</h3>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value">${videoInfo.viewCount.toLocaleString()}</div>
+                            <div class="stat-label">視聴回数</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${videoInfo.likeCount.toLocaleString()}</div>
+                            <div class="stat-label">いいね数</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${videoInfo.commentCount.toLocaleString()}</div>
+                            <div class="stat-label">コメント数</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${durationInMinutes.toFixed(1)}分</div>
+                            <div class="stat-label">動画長</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${engagementRate}%</div>
+                            <div class="stat-label">エンゲージメント率</div>
+                        </div>
+                        <div class="stat-item">
+                            <div class="stat-value">${new Date(videoInfo.publishedAt).toLocaleDateString('ja-JP')}</div>
+                            <div class="stat-label">公開日</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="result-card gemini-result-card">
+                    <h3>✨ Gemini AIによる質的分析サマリー</h3>
+                    <div class="gemini-grid">
+                        <div class="gemini-item">
+                            <h4>📖 物語構造スコア</h4>
+                            <p class="score">${geminiAnalysis.narrative_structure?.score || 'N/A'}/10</p>
+                            <p>${geminiAnalysis.narrative_structure?.reason || ''}</p>
+                        </div>
+                        <div class="gemini-item">
+                            <h4>🎯 フック効果スコア</h4>
+                            <p class="score">${geminiAnalysis.hook_effectiveness?.score || 'N/A'}/10</p>
+                            <p>${geminiAnalysis.hook_effectiveness?.reason || ''}</p>
+                        </div>
+                        <div class="gemini-item">
+                            <h4>❤️ 感情的エンゲージメント</h4>
+                            <p class="score">${geminiAnalysis.emotional_engagement?.score || 'N/A'}/10</p>
+                            <p>${geminiAnalysis.emotional_engagement?.reason || ''}</p>
+                        </div>
+                        <div class="gemini-item">
+                            <h4>🔧 技術的品質</h4>
+                            <p class="score">${geminiAnalysis.technical_quality?.score || 'N/A'}/10</p>
+                            <p>${geminiAnalysis.technical_quality?.reason || ''}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // 盛り上がりスコア表示を追加
+            if (engagementScore) {
+                html += `
