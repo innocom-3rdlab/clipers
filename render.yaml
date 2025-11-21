@@ -1,0 +1,26 @@
+# This file is used to configure the deployment of your application on Render.
+# For more information, see https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: clips-ai
+    env: node
+    # The free plan is a good starting point. You can upgrade later.
+    # See https://render.com/pricing for more details.
+    plan: free
+    # The root directory of your server code
+    rootDir: ./server
+    buildCommand: "npm install"
+    startCommand: "node server.js"
+    envVars:
+      - key: APP_BASE_URL
+        # This automatically uses the URL of your deployed service
+        value: ${RENDER_EXTERNAL_URL}
+      # It is recommended to set the following sensitive values 
+      # in the Render dashboard under Environment.
+      # Create a new Secret File or set them as environment variables.
+      # GOOGLE_CLIENT_ID
+      # GOOGLE_CLIENT_SECRET
+      # GOOGLE_API_KEY
+      # JWT_SECRET
+      # BUCKET_NAME

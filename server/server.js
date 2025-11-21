@@ -37,7 +37,7 @@ const storage = new Storage({ keyFilename: keyFilePath });
 const languageClient = new LanguageServiceClient({ keyFilename: keyFilePath });
 const BUCKET_NAME = 'clipersworkstrage';
 const JWT_SECRET = 'your-super-secret-key-for-jwt';
-const GOOGLE_API_KEY = 'AIzaSyBnBhi9abL2VULcXSO12WSw47UE7T5xRIs';
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || null;
 
 // --- Google OAuth 設定 ---
 // ★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★★
